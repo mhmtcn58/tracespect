@@ -1,14 +1,19 @@
+import os
+import io
 import asyncio
 import json
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import HTMLResponse
 from sse_starlette.sse import EventSourceResponse
 import httpx
+from PIL import Image, ExifTags
+import cv2
+import numpy as np
 
 app = FastAPI(title="TraceSpect - OSINT & Visual Intelligence")
 
-# SerpAPI anahtarını çift tırnakların içine yapıştır
-SERPAPI_KEY = "ba1cb11f55022f3ae3bc19abc8ac7c6fca407eaf8973aa9cb26afd6a582cd003"
+# SerpAPI anahtarını ortam değişkeninden alır veya varsayılanı kullanır
+SERPAPI_KEY = os.getenv("SERPAPI_KEY", "ba1cb11f55022f3ae3bc19abc8ac7c6fca407eaf8973aa9cb26afd6a582cd003")
 
 # 26 Platform ve Doğrulama Kuralları
 SITES = {
@@ -71,6 +76,56 @@ def detect_platform(url: str):
     else:
         return {"name": "Web Kaynağı", "icon": "fa-solid fa-globe", "color": "text-slate-400 bg-slate-800 border-slate-700"}
 
+# EXIF Meta Veri Çıkarıcı
+def extract_metadata(image_bytes: bytes):
+    meta = {}
+    try:
+        image = Image.open(io.BytesIO(image_bytes))
+        meta["Format"] = image.format
+        meta["Boyut"] = f"{image.width}x{image.height} px"
+        
+        exif = image.getexif()
+        if exif:
+            for tag_id, value in exif.items():
+                tag = ExifTags.TAGS.get(tag_id, tag_id)
+                if tag in ["Make", "Model", "DateTime", "Software"]:
+                    meta[str(tag)] = str(value)
+    except Exception:
+        pass
+    return meta
+
+# Otomatik Yüz Kırpma Motoru
+def process_face_crop(image_bytes: bytes):
+    try:
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img is None:
+            return image_bytes, False
+        
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=4, minSize=(60, 60))
+        
+        if len(faces) > 0:
+            # En belirgin yüzü al
+            x, y, w, h = max(faces, key=lambda b: b[2] * b[3])
+            pad_w = int(w * 0.25)
+            pad_h = int(h * 0.25)
+            h_img, w_img, _ = img.shape
+            
+            y1 = max(0, y - pad_h)
+            y2 = min(h_img, y + h + pad_h)
+            x1 = max(0, x - pad_w)
+            x2 = min(w_img, x + w + pad_w)
+            
+            cropped = img[y1:y2, x1:x2]
+            success, buffer = cv2.imencode('.jpg', cropped)
+            if success:
+                return buffer.tobytes(), True
+    except Exception:
+        pass
+    return image_bytes, False
+
 async def check_site(client: httpx.AsyncClient, name: str, config: dict, username: str):
     target_url = config["url"].format(username)
     headers = config.get("headers", {
@@ -103,28 +158,34 @@ async def search_username(username: str):
             yield {"event": "done", "data": json.dumps({"status": "completed"})}
     return EventSourceResponse(event_generator())
 
-# --- GÖRSEL VE YÜZ ARAMA API ENDPOINT ---
+# --- GÖRSEL, YÜZ VE METAVERİ ARAMA API ENDPOINT ---
 @app.post("/api/search-image")
 async def search_image(image: UploadFile = File(...)):
     if not SERPAPI_KEY or SERPAPI_KEY == "BURAYA_SERPAPI_KEY_YAZ":
-        return {"success": False, "error": "Lütfen main.py dosyasındaki SERPAPI_KEY alanına anahtarınızı girin."}
+        return {"success": False, "error": "Lütfen SERPAPI_KEY tanımlamasını yapın."}
     
     try:
-        contents = await image.read()
+        raw_contents = await image.read()
+        
+        # 1. Meta verileri (EXIF) çıkar
+        metadata = extract_metadata(raw_contents)
+        
+        # 2. Yüz algılama ve odak kırpma yap
+        optimized_bytes, face_found = process_face_crop(raw_contents)
         
         async with httpx.AsyncClient(timeout=25.0) as client:
-            # 1. Fotoğrafı geçici açık sunucuya yükle
+            # 3. Optimize edilmiş görseli geçici sunucuya yükle
             upload_res = await client.post(
                 "https://tmpfiles.org/api/v1/upload",
-                files={"file": (image.filename, contents, image.content_type)}
+                files={"file": ("search.jpg", optimized_bytes, "image/jpeg")}
             )
             if upload_res.status_code != 200:
-                return {"success": False, "error": "Fotoğraf geçici depolama sunucusuna yüklenemedi."}
+                return {"success": False, "error": "Görsel analiz sunucusuna aktarılamadı."}
             
             raw_url = upload_res.json()["data"]["url"]
             direct_image_url = raw_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
 
-            # 2. SerpAPI Google Lens Motoruna HTTP İsteği At
+            # 4. Google Lens üzerinden görsel eşleşmeleri çek
             serp_url = "https://serpapi.com/search.json"
             params = {
                 "engine": "google_lens",
@@ -155,7 +216,12 @@ async def search_image(image: UploadFile = File(...)):
                         "color": platform_info["color"]
                     })
                     
-            return {"success": True, "matches": matches}
+            return {
+                "success": True, 
+                "matches": matches, 
+                "metadata": metadata, 
+                "face_detected": face_found
+            }
             
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -182,16 +248,16 @@ async def serve_ui():
                     <i class="fa-solid fa-fingerprint text-3xl"></i>
                 </div>
                 <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mb-2">TraceSpect</h1>
-                <p class="text-slate-400 text-sm sm:text-base">Kullanıcı adı veya yüz/görsel verisiyle dijital ayak izi ve profil analizi.</p>
+                <p class="text-slate-400 text-sm sm:text-base">Kullanıcı adı, EXIF meta veri ve yüz analiziyle dijital ayak izi taraması.</p>
             </div>
 
             <!-- Tab Buttons -->
             <div class="flex justify-center mb-6 bg-slate-900 p-1.5 rounded-xl border border-slate-800 w-fit mx-auto shadow-lg">
                 <button id="tabUsername" onclick="switchTab('username')" class="px-5 py-2.5 rounded-lg text-sm font-medium transition-all bg-indigo-600 text-white flex items-center gap-2">
-                    <i class="fa-solid fa-at"></i> Kullanıcı Adı ile İncele
+                    <i class="fa-solid fa-at"></i> Kullanıcı Adı
                 </button>
                 <button id="tabImage" onclick="switchTab('image')" class="px-5 py-2.5 rounded-lg text-sm font-medium transition-all text-slate-400 hover:text-white flex items-center gap-2">
-                    <i class="fa-solid fa-camera"></i> Yüz / Görsel ile İncele
+                    <i class="fa-solid fa-camera"></i> Yüz / Görsel OSINT
                 </button>
             </div>
 
@@ -227,10 +293,10 @@ async def serve_ui():
                         </div>
                         <div class="flex gap-2">
                             <button id="filterBtn" class="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-slate-300 transition-colors">
-                                Sadece Bulunanları Göster
+                                Sadece Bulunanlar
                             </button>
                             <button id="exportBtn" class="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-slate-300 transition-colors hidden">
-                                <i class="fa-solid fa-file-arrow-down mr-1"></i> Raporu İndir
+                                <i class="fa-solid fa-file-arrow-down mr-1"></i> CSV İndir
                             </button>
                         </div>
                     </div>
@@ -246,22 +312,30 @@ async def serve_ui():
                     <div id="dropZone" onclick="document.getElementById('imageInput').click()" 
                         class="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-xl p-8 cursor-pointer transition-colors flex flex-col items-center justify-center">
                         <i class="fa-solid fa-expand text-4xl text-indigo-400 mb-3"></i>
-                        <p class="text-slate-200 font-medium mb-1">Fotoğraf seçin veya bu alana bırakın</p>
-                        <p class="text-slate-500 text-xs">JPG, PNG veya WEBP formatında portre / görsel</p>
+                        <p class="text-slate-200 font-medium mb-1">Fotoğraf seçin veya sürükleyin</p>
+                        <p class="text-slate-500 text-xs">Yüz algılama ve EXIF meta analizi otomatik uygulanır</p>
                     </div>
 
                     <div id="previewContainer" class="hidden mt-4 flex flex-col items-center">
                         <img id="imagePreview" src="" class="h-44 rounded-xl object-cover border border-slate-700 mb-3 shadow-lg">
                         <button id="imageSearchBtn" onclick="submitImageSearch()"
                             class="bg-indigo-600 hover:bg-indigo-500 px-6 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/30">
-                            <span>TraceSpect ile Ağları Tara</span>
+                            <span>Analiz Et ve Ağları Tara</span>
                             <i class="fa-solid fa-radar"></i>
                         </button>
                     </div>
                 </div>
 
                 <div id="imageSearchStatus" class="hidden text-center text-sm font-medium text-indigo-400 mb-4 animate-pulse">
-                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Görsel eşleşmeleri ve bağlantılı profiller taranıyor...
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Yüz odaklanıyor, meta veriler çıkarılıyor ve ağlar taranıyor...
+                </div>
+
+                <!-- EXIF Meta Bilgi Kartı -->
+                <div id="metadataCard" class="hidden mb-6 bg-slate-900/90 border border-indigo-500/30 rounded-xl p-4 text-xs">
+                    <div class="flex items-center gap-2 text-indigo-400 font-semibold mb-2 border-b border-slate-800 pb-2">
+                        <i class="fa-solid fa-circle-info"></i> Fotoğraf Meta Veri Analizi (EXIF)
+                    </div>
+                    <div id="metadataContent" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-slate-300"></div>
                 </div>
 
                 <div id="imageResults" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
@@ -307,7 +381,7 @@ async def serve_ui():
 
             filterBtn.addEventListener('click', () => {
                 onlyFoundFilter = !onlyFoundFilter;
-                filterBtn.innerText = onlyFoundFilter ? 'Tümünü Göster' : 'Sadece Bulunanları Göster';
+                filterBtn.innerText = onlyFoundFilter ? 'Tümünü Göster' : 'Sadece Bulunanlar';
                 filterBtn.classList.toggle('bg-indigo-600', onlyFoundFilter);
                 document.querySelectorAll('.result-card').forEach(card => {
                     card.classList.toggle('hidden', onlyFoundFilter && card.dataset.found === 'false');
@@ -398,6 +472,8 @@ async def serve_ui():
             const imageResults = document.getElementById('imageResults');
             const imageSearchStatus = document.getElementById('imageSearchStatus');
             const imageSearchBtn = document.getElementById('imageSearchBtn');
+            const metadataCard = document.getElementById('metadataCard');
+            const metadataContent = document.getElementById('metadataContent');
 
             imageInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
@@ -419,6 +495,8 @@ async def serve_ui():
                 formData.append('image', file);
 
                 imageResults.innerHTML = '';
+                metadataContent.innerHTML = '';
+                metadataCard.classList.add('hidden');
                 imageSearchStatus.classList.remove('hidden');
                 imageSearchBtn.disabled = true;
                 imageSearchBtn.classList.add('opacity-50');
@@ -437,6 +515,17 @@ async def serve_ui():
                     if (!data.success) {
                         alert('Hata: ' + data.error);
                         return;
+                    }
+
+                    // Metadata kartını doldur
+                    if (data.metadata && Object.keys(data.metadata).length > 0) {
+                        metadataCard.classList.remove('hidden');
+                        for (const [k, v] of Object.entries(data.metadata)) {
+                            metadataContent.innerHTML += `<div class="bg-slate-950/60 p-2 rounded border border-slate-800"><span class="text-slate-500 block text-[10px]">${k}</span><strong class="text-white">${v}</strong></div>`;
+                        }
+                        if (data.face_detected) {
+                            metadataContent.innerHTML += `<div class="bg-indigo-950/40 p-2 rounded border border-indigo-500/30 col-span-2 sm:col-span-3 text-indigo-300"><i class="fa-solid fa-user-check mr-1"></i> Yüz başarıyla algılandı ve odaklanarak tarandı.</div>`;
+                        }
                     }
 
                     if (data.matches.length === 0) {
