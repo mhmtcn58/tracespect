@@ -228,6 +228,8 @@ async def serve_ui():
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+        <!-- PDF Export Motoru -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
         <style>
             body { font-family: 'Plus Jakarta Sans', sans-serif; }
             .font-mono { font-family: 'JetBrains Mono', monospace; }
@@ -248,8 +250,28 @@ async def serve_ui():
     </head>
     <body class="bg-[#070b14] text-slate-100 min-h-screen flex flex-col items-center cyber-grid antialiased selection:bg-indigo-500 selection:text-white">
         
+        <!-- PAYWALL VIP KİLİT PENCERESİ -->
+        <div id="paywallModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+            <div class="glass-panel max-w-md w-full rounded-3xl p-8 text-center shadow-2xl border border-indigo-500/40 relative">
+                <div class="h-16 w-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg shadow-rose-500/20">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <h2 class="text-2xl font-extrabold text-white mb-2 tracking-tight">Günlük Ücretsiz Limit Doldu</h2>
+                <p class="text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
+                    Günde en fazla 2 ücretsiz tarama yapabilirsiniz. Sınırsız derin web taraması, yüz biyometrisi ve PDF raporlar için VIP erişim sağlayın.
+                </p>
+                <a href="https://shopier.com/TraceSpectVIP" target="_blank" 
+                   class="w-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:opacity-95 transition-all text-white font-bold py-3.5 px-6 rounded-xl block shadow-xl shadow-indigo-600/30 text-sm">
+                    <i class="fa-solid fa-bolt mr-1"></i> Sınırsız VIP Erişim Al (49 TL)
+                </a>
+                <button onclick="document.getElementById('paywallModal').classList.add('hidden')" class="mt-4 text-slate-500 text-xs hover:text-slate-300 transition-colors">
+                    Pencereyi Kapat
+                </button>
+            </div>
+        </div>
+
         <!-- Navigation Header -->
-        <nav class="w-full border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex justify-between items-center max-w-7xl mx-auto">
+        <nav class="w-full border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-40 px-6 py-3.5 flex justify-between items-center max-w-7xl mx-auto">
             <div class="flex items-center gap-3">
                 <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
                     <i class="fa-solid fa-radar text-white text-base"></i>
@@ -261,8 +283,8 @@ async def serve_ui():
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <a href="#sponsor" class="text-xs font-semibold px-3.5 py-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 transition-all flex items-center gap-2">
-                    <i class="fa-solid fa-mug-hot text-amber-400"></i> Destek Ol
+                <a href="https://shopier.com/TraceSpectVIP" target="_blank" class="text-xs font-semibold px-3.5 py-2 rounded-lg bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/30 text-indigo-300 transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-crown text-amber-400"></i> VIP Kredi
                 </a>
             </div>
         </nav>
@@ -295,7 +317,7 @@ async def serve_ui():
 
             <!-- TOP AD BANNER PLACEHOLDER (AdSense İçin Hazır Alan) -->
             <div class="w-full mb-6 p-3 rounded-xl bg-slate-900/40 border border-slate-800/50 text-center text-slate-600 text-xs font-mono tracking-wider">
-                [ SPONSOR ALANI / REKLAM YERLEŞİMİ ]
+                [ SPONSOR ALANI / GOOGLE ADSENSE YERLEŞİMİ ]
             </div>
 
             <!-- 1. TAB: USERNAME SECTION -->
@@ -334,8 +356,11 @@ async def serve_ui():
                             <button id="filterBtn" class="bg-slate-800/80 hover:bg-slate-700 px-3.5 py-1.5 rounded-lg text-slate-300 transition-colors border border-slate-700">
                                 Sadece Bulunanlar
                             </button>
-                            <button id="exportBtn" class="bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/30 px-3.5 py-1.5 rounded-lg text-indigo-300 transition-colors hidden font-semibold">
-                                <i class="fa-solid fa-file-arrow-down mr-1"></i> Raporu İndir
+                            <button id="exportCsvBtn" class="bg-slate-800/80 hover:bg-slate-700 px-3.5 py-1.5 rounded-lg text-slate-300 transition-colors hidden border border-slate-700">
+                                CSV İndir
+                            </button>
+                            <button id="exportPdfBtn" onclick="exportPDF()" class="bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/30 px-3.5 py-1.5 rounded-lg text-indigo-300 transition-colors hidden font-semibold">
+                                <i class="fa-solid fa-file-pdf text-rose-400 mr-1"></i> Raporu (PDF) İndir
                             </button>
                         </div>
                     </div>
@@ -393,7 +418,7 @@ async def serve_ui():
 
         </main>
 
-        <!-- Footer / Legal Info (AdSense Onayı İçin Zorunlu) -->
+        <!-- Footer / Legal Info -->
         <footer class="w-full border-t border-slate-900 bg-slate-950/80 py-8 px-6 mt-12 text-center text-xs text-slate-500">
             <div class="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
                 <p>TraceSpect Intelligence &copy; 2026. Tüm hakları saklıdır.</p>
@@ -406,6 +431,22 @@ async def serve_ui():
         </footer>
 
         <script>
+            // GÜNLÜK 2 ARAMA LİMİTİ KONTROL MOTORU
+            function checkLimit() {
+                const today = new Date().toISOString().slice(0, 10);
+                if (localStorage.getItem('ts_date') !== today) {
+                    localStorage.setItem('ts_date', today);
+                    localStorage.setItem('ts_count', '0');
+                }
+                let count = parseInt(localStorage.getItem('ts_count') || '0');
+                if (count >= 2) {
+                    document.getElementById('paywallModal').classList.remove('hidden');
+                    return false;
+                }
+                localStorage.setItem('ts_count', (count + 1).toString());
+                return true;
+            }
+
             function switchTab(tab) {
                 const isUser = tab === 'username';
                 document.getElementById('usernameSection').classList.toggle('hidden', !isUser);
@@ -432,9 +473,11 @@ async def serve_ui():
             const notFoundCountSpan = document.getElementById('notFoundCount');
             const submitBtn = document.getElementById('submitBtn');
             const filterBtn = document.getElementById('filterBtn');
-            const exportBtn = document.getElementById('exportBtn');
+            const exportCsvBtn = document.getElementById('exportCsvBtn');
+            const exportPdfBtn = document.getElementById('exportPdfBtn');
 
             let foundCount = 0, notFoundCount = 0, currentResults = [], onlyFoundFilter = false, activeEventSource = null;
+            let currentTargetUser = "";
 
             filterBtn.addEventListener('click', () => {
                 onlyFoundFilter = !onlyFoundFilter;
@@ -445,7 +488,7 @@ async def serve_ui():
                 });
             });
 
-            exportBtn.addEventListener('click', () => {
+            exportCsvBtn.addEventListener('click', () => {
                 const foundItems = currentResults.filter(r => r.found);
                 let csvContent = "data:text/csv;charset=utf-8,Platform,URL\\n";
                 foundItems.forEach(r => csvContent += `"${r.platform}","${r.url}"\\n`);
@@ -457,10 +500,36 @@ async def serve_ui():
                 document.body.removeChild(link);
             });
 
+            // PDF İHRACAT FONKSİYONU
+            function exportPDF() {
+                const element = document.createElement('div');
+                element.innerHTML = `
+                    <div style="font-family: Arial, sans-serif; padding: 25px; color: #0f172a; background: #ffffff;">
+                        <h1 style="color: #4f46e5; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; font-size: 24px;">TRACESPECT OSINT RAPORU</h1>
+                        <p style="font-size: 13px; color: #475569; margin-top: 10px;">
+                            <strong>Hedef:</strong> ${currentTargetUser}<br>
+                            <strong>Tarih:</strong> ${new Date().toLocaleString('tr-TR')}
+                        </p>
+                        <h3 style="margin-top: 20px; font-size: 16px; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px;">Tespit Edilen Aktif Profiller (${foundCount}):</h3>
+                        <ul style="line-height: 1.8; font-size: 13px; margin-top: 10px;">
+                            ${currentResults.filter(r => r.found).map(r => `<li><b>${r.platform}:</b> <a href="${r.url}" style="color: #4f46e5;">${r.url}</a></li>`).join('')}
+                        </ul>
+                        <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 10px; color: #94a3b8;">
+                            * Bu rapor TraceSpect açık kaynak istihbarat motoru tarafından otomatik oluşturulmuştur.
+                        </div>
+                    </div>
+                `;
+                html2pdf().set({ margin: 0.5, filename: `TraceSpect_Rapor_${currentTargetUser}.pdf`, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } }).from(element).save();
+            }
+
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
+                if (!checkLimit()) return; // GÜNLÜK LİMİT KONTROLÜ
+
                 const username = input.value.trim();
                 if (!username) return;
+                currentTargetUser = username;
+
                 if (activeEventSource) activeEventSource.close();
 
                 resultsDiv.innerHTML = '';
@@ -473,7 +542,8 @@ async def serve_ui():
                 progressText.innerText = '0%';
                 statusText.innerText = 'İz sürülüyor...';
                 statsSection.classList.remove('hidden');
-                exportBtn.classList.add('hidden');
+                exportCsvBtn.classList.add('hidden');
+                exportPdfBtn.classList.add('hidden');
                 submitBtn.disabled = true;
                 submitBtn.classList.add('opacity-50');
 
@@ -510,7 +580,10 @@ async def serve_ui():
                     statusText.innerText = 'Tarama tamamlandı.';
                     submitBtn.disabled = false;
                     submitBtn.classList.remove('opacity-50');
-                    if (foundCount > 0) exportBtn.classList.remove('hidden');
+                    if (foundCount > 0) {
+                        exportCsvBtn.classList.remove('hidden');
+                        exportPdfBtn.classList.remove('hidden');
+                    }
                     activeEventSource.close();
                 });
 
@@ -550,6 +623,8 @@ async def serve_ui():
             async function submitImageSearch() {
                 const file = imageInput.files[0];
                 if (!file) return;
+
+                if (!checkLimit()) return; // GÜNLÜK LİMİT KONTROLÜ
 
                 const formData = new FormData();
                 formData.append('image', file);
