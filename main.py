@@ -250,13 +250,13 @@ async def serve_ui():
     </head>
     <body class="bg-[#070b14] text-slate-100 min-h-screen flex flex-col items-center cyber-grid antialiased selection:bg-indigo-500 selection:text-white">
         
-        <!-- PAYWALL VIP KİLİT PENCERESİ -->
+        <!-- 1. MODAL: PAYWALL VIP KİLİT PENCERESİ -->
         <div id="paywallModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
             <div class="glass-panel max-w-md w-full rounded-3xl p-8 text-center shadow-2xl border border-indigo-500/40 relative">
                 <div class="h-16 w-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg shadow-rose-500/20">
                     <i class="fa-solid fa-lock"></i>
                 </div>
-                <h2 class="text-2xl font-extrabold text-white mb-2 tracking-tight">Günlük Ücretsiz Limit Doldu</h2>
+                <h2 class="text-2xl font-extrabold text-white mb-2 tracking-tight">Günlük Limit Doldu</h2>
                 <p class="text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
                     Günde en fazla 2 ücretsiz tarama yapabilirsiniz. Sınırsız derin web taraması, yüz biyometrisi ve PDF raporlar için VIP erişim sağlayın.
                 </p>
@@ -267,6 +267,49 @@ async def serve_ui():
                 <button onclick="document.getElementById('paywallModal').classList.add('hidden')" class="mt-4 text-slate-500 text-xs hover:text-slate-300 transition-colors">
                     Pencereyi Kapat
                 </button>
+            </div>
+        </div>
+
+        <!-- 2. MODAL: DESTEK & BAĞIŞ (KRİPTO / BUYMEACOFFEE) -->
+        <div id="donateModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+            <div class="glass-panel max-w-md w-full rounded-3xl p-6 text-center shadow-2xl border border-indigo-500/40 relative">
+                <div class="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-3 text-2xl">
+                    <i class="fa-solid fa-mug-hot"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">Geliştiriciye Destek Ol</h3>
+                <p class="text-slate-400 text-xs mb-4">Sunucu masraflarını ve açık kaynak geliştirmeyi destekleyin.</p>
+                
+                <div class="space-y-3 text-left">
+                    <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
+                        <span class="text-[10px] text-slate-500 block uppercase font-mono mb-1">USDT Cüzdanı (TRC-20):</span>
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs text-indigo-300 font-mono truncate" id="walletAddr">TLx52H9kLqzNf7G3V8xP9q4A1TraceSpect</span>
+                            <button onclick="copyWallet()" class="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 text-xs px-2.5 py-1 rounded transition-colors font-mono">
+                                <span id="copyBtnTxt"><i class="fa-solid fa-copy"></i></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="document.getElementById('donateModal').classList.add('hidden')" class="mt-5 text-slate-500 text-xs hover:text-slate-300">Kapat</button>
+            </div>
+        </div>
+
+        <!-- 3. MODAL: GİZLİLİK POLİTİKASI & YASAL UYARI -->
+        <div id="privacyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+            <div class="glass-panel max-w-lg w-full rounded-3xl p-6 text-left shadow-2xl border border-slate-800 text-xs text-slate-300 max-h-[80vh] overflow-y-auto">
+                <h3 class="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-indigo-400"></i> Gizlilik & Yasal Sorumluluk Reddi
+                </h3>
+                <p class="mb-2 leading-relaxed">
+                    1. <strong>Açık Kaynak İstihbarat:</strong> TraceSpect, yalnızca kamuya açık arama motorları ve sosyal platformlar tarafından indekslenmiş verileri (OSINT) analiz eder.
+                </p>
+                <p class="mb-2 leading-relaxed">
+                    2. <strong>Sıfır Veri Depolama:</strong> Yüklenen fotoğraflar veya aranan kullanıcı adları sunucularımızda asla depolanmaz, arşivlenmez veya üçüncü kişilerle paylaşılmaz.
+                </p>
+                <p class="mb-4 leading-relaxed">
+                    3. <strong>Sorumluluk:</strong> Çıkan sonuçlar kamuya açık verilerin eşleştirilmesidir, arama yapan kullanıcının kendi sorumluluğundadır.
+                </p>
+                <button onclick="document.getElementById('privacyModal').classList.add('hidden')" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 rounded-xl">Anladım</button>
             </div>
         </div>
 
@@ -283,6 +326,9 @@ async def serve_ui():
                 </div>
             </div>
             <div class="flex items-center gap-3">
+                <button onclick="document.getElementById('donateModal').classList.remove('hidden')" class="text-xs font-semibold px-3.5 py-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-mug-hot text-amber-400"></i> Destek Ol
+                </button>
                 <a href="https://shopier.com/TraceSpectVIP" target="_blank" class="text-xs font-semibold px-3.5 py-2 rounded-lg bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/30 text-indigo-300 transition-all flex items-center gap-2">
                     <i class="fa-solid fa-crown text-amber-400"></i> VIP Kredi
                 </a>
@@ -315,7 +361,7 @@ async def serve_ui():
                 </button>
             </div>
 
-            <!-- TOP AD BANNER PLACEHOLDER (AdSense İçin Hazır Alan) -->
+            <!-- TOP AD BANNER PLACEHOLDER -->
             <div class="w-full mb-6 p-3 rounded-xl bg-slate-900/40 border border-slate-800/50 text-center text-slate-600 text-xs font-mono tracking-wider">
                 [ SPONSOR ALANI / GOOGLE ADSENSE YERLEŞİMİ ]
             </div>
@@ -423,15 +469,15 @@ async def serve_ui():
             <div class="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
                 <p>TraceSpect Intelligence &copy; 2026. Tüm hakları saklıdır.</p>
                 <div class="flex gap-4">
-                    <a href="#" class="hover:text-slate-400 transition-colors">Gizlilik Politikası</a>
-                    <a href="#" class="hover:text-slate-400 transition-colors">Kullanım Şartları</a>
-                    <a href="#" class="hover:text-slate-400 transition-colors">API & İletişim</a>
+                    <button onclick="document.getElementById('privacyModal').classList.remove('hidden')" class="hover:text-slate-400 transition-colors">Gizlilik Politikası</button>
+                    <button onclick="document.getElementById('privacyModal').classList.remove('hidden')" class="hover:text-slate-400 transition-colors">Kullanım Şartları</button>
+                    <a href="mailto:support@tracespect.com" class="hover:text-slate-400 transition-colors">İletişim & API</a>
                 </div>
             </div>
         </footer>
 
         <script>
-            // GÜNLÜK 2 ARAMA LİMİTİ KONTROL MOTORU
+            // GÜNLÜK 2 ARAMA LİMİTİ KONTROLÜ (1. ADIM)
             function checkLimit() {
                 const today = new Date().toISOString().slice(0, 10);
                 if (localStorage.getItem('ts_date') !== today) {
@@ -445,6 +491,15 @@ async def serve_ui():
                 }
                 localStorage.setItem('ts_count', (count + 1).toString());
                 return true;
+            }
+
+            function copyWallet() {
+                const addr = document.getElementById('walletAddr').innerText;
+                navigator.clipboard.writeText(addr);
+                document.getElementById('copyBtnTxt').innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i>';
+                setTimeout(() => {
+                    document.getElementById('copyBtnTxt').innerHTML = '<i class="fa-solid fa-copy"></i>';
+                }, 2000);
             }
 
             function switchTab(tab) {
@@ -500,31 +555,78 @@ async def serve_ui():
                 document.body.removeChild(link);
             });
 
-            // PDF İHRACAT FONKSİYONU
+            // RESMİ ADLİ & İSTİHBARAT PDF RAPOR MOTORU (3. ADIM)
             function exportPDF() {
+                const caseId = 'TS-' + Math.floor(100000 + Math.random() * 900000);
                 const element = document.createElement('div');
                 element.innerHTML = `
-                    <div style="font-family: Arial, sans-serif; padding: 25px; color: #0f172a; background: #ffffff;">
-                        <h1 style="color: #4f46e5; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; font-size: 24px;">TRACESPECT OSINT RAPORU</h1>
-                        <p style="font-size: 13px; color: #475569; margin-top: 10px;">
-                            <strong>Hedef:</strong> ${currentTargetUser}<br>
-                            <strong>Tarih:</strong> ${new Date().toLocaleString('tr-TR')}
-                        </p>
-                        <h3 style="margin-top: 20px; font-size: 16px; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px;">Tespit Edilen Aktif Profiller (${foundCount}):</h3>
-                        <ul style="line-height: 1.8; font-size: 13px; margin-top: 10px;">
-                            ${currentResults.filter(r => r.found).map(r => `<li><b>${r.platform}:</b> <a href="${r.url}" style="color: #4f46e5;">${r.url}</a></li>`).join('')}
-                        </ul>
-                        <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 10px; color: #94a3b8;">
-                            * Bu rapor TraceSpect açık kaynak istihbarat motoru tarafından otomatik oluşturulmuştur.
+                    <div style="font-family: Arial, sans-serif; padding: 30px; color: #0f172a; background: #ffffff; line-height: 1.5;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4f46e5; padding-bottom: 15px; margin-bottom: 20px;">
+                            <div>
+                                <h1 style="color: #4f46e5; margin: 0; font-size: 22px; font-weight: bold; letter-spacing: -0.5px;">TRACESPECT OSINT LABS</h1>
+                                <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b;">AÇIK KAYNAK DİJİTAL İSTİHBARAT & İZ SÜRME RAPORU</p>
+                            </div>
+                            <div style="text-align: right; font-size: 11px; color: #64748b;">
+                                <div><strong>Vaka ID:</strong> #${caseId}</div>
+                                <div><strong>Tarih:</strong> ${new Date().toLocaleString('tr-TR')}</div>
+                            </div>
+                        </div>
+
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
+                            <tr style="background: #f8fafc;">
+                                <td style="padding: 8px; border: 1px solid #e2e8f0; width: 30%;"><strong>Hedef Kullanıcı:</strong></td>
+                                <td style="padding: 8px; border: 1px solid #e2e8f0; color: #4f46e5; font-weight: bold;">${currentTargetUser}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Taranan Platform Sayısı:</strong></td>
+                                <td style="padding: 8px; border: 1px solid #e2e8f0;">${currentResults.length} Platform</td>
+                            </tr>
+                            <tr style="background: #f8fafc;">
+                                <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Tespit Edilen Aktif Hesap:</strong></td>
+                                <td style="padding: 8px; border: 1px solid #e2e8f0; color: #059669; font-weight: bold;">${foundCount} Profil Bulundu</td>
+                            </tr>
+                        </table>
+
+                        <h3 style="font-size: 14px; color: #1e293b; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; margin-bottom: 12px;">
+                            TESPİT EDİLEN AKTİF PROFİLLER
+                        </h3>
+                        
+                        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                            <thead>
+                                <tr style="background: #4f46e5; color: #ffffff; text-align: left;">
+                                    <th style="padding: 8px; border: 1px solid #4f46e5;">Platform</th>
+                                    <th style="padding: 8px; border: 1px solid #4f46e5;">Profil Doğrulama Bağlantısı</th>
+                                    <th style="padding: 8px; border: 1px solid #4f46e5; width: 80px;">Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${currentResults.filter(r => r.found).map((r, i) => `
+                                    <tr style="background: ${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                                        <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: bold;">${r.platform}</td>
+                                        <td style="padding: 8px; border: 1px solid #e2e8f0;"><a href="${r.url}" style="color: #4f46e5; text-decoration: none;">${r.url}</a></td>
+                                        <td style="padding: 8px; border: 1px solid #e2e8f0; color: #059669; font-weight: bold;">DOĞRULANDI</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+
+                        <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 9px; color: #94a3b8; text-align: justify;">
+                            <strong>Yasal Uyarı & Beyan:</strong> Bu rapor kamuya açık OSINT veritabanları sorgulanarak TraceSpect motoru tarafından otomatik olarak derlenmiştir. Rapordaki bulgular arama anındaki aktiflik durumunu gösterir.
                         </div>
                     </div>
                 `;
-                html2pdf().set({ margin: 0.5, filename: `TraceSpect_Rapor_${currentTargetUser}.pdf`, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } }).from(element).save();
+                html2pdf().set({ 
+                    margin: 0.4, 
+                    filename: `TraceSpect_Adli_Rapor_${currentTargetUser}_${caseId}.pdf`, 
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2 },
+                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } 
+                }).from(element).save();
             }
 
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
-                if (!checkLimit()) return; // GÜNLÜK LİMİT KONTROLÜ
+                if (!checkLimit()) return;
 
                 const username = input.value.trim();
                 if (!username) return;
@@ -624,7 +726,7 @@ async def serve_ui():
                 const file = imageInput.files[0];
                 if (!file) return;
 
-                if (!checkLimit()) return; // GÜNLÜK LİMİT KONTROLÜ
+                if (!checkLimit()) return;
 
                 const formData = new FormData();
                 formData.append('image', file);
