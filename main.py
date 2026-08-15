@@ -361,9 +361,18 @@ async def serve_ui():
                 </button>
             </div>
 
-            <!-- TOP AD BANNER PLACEHOLDER -->
-            <div class="w-full mb-6 p-3 rounded-xl bg-slate-900/40 border border-slate-800/50 text-center text-slate-600 text-xs font-mono tracking-wider">
-                [ SPONSOR ALANI / GOOGLE ADSENSE YERLEŞİMİ ]
+            <!-- ADSTERRA BANNER REKLAM YERLEŞİM ALANI -->
+            <div class="w-full mb-6 flex justify-center items-center overflow-hidden min-h-[90px]">
+                <script type="text/javascript">
+                    atOptions = {
+                        'key' : 'd9328c8df4720e82a028b8d6a0f4c2ee',
+                        'format' : 'iframe',
+                        'height' : 90,
+                        'width' : 728,
+                        'params' : {}
+                    };
+                </script>
+                <script type="text/javascript" src="https://www.highperformanceformat.com/d9328c8df4720e82a028b8d6a0f4c2ee/invoke.js"></script>
             </div>
 
             <!-- 1. TAB: USERNAME SECTION -->
