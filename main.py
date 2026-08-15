@@ -2,6 +2,7 @@ import os
 import io
 import asyncio
 import json
+import base64
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import HTMLResponse
 from sse_starlette.sse import EventSourceResponse
@@ -12,10 +13,8 @@ import numpy as np
 
 app = FastAPI(title="TraceSpect - OSINT & Visual Intelligence")
 
-# SerpAPI anahtarını ortam değişkeninden alır veya varsayılanı kullanır
 SERPAPI_KEY = os.getenv("SERPAPI_KEY", "ba1cb11f55022f3ae3bc19abc8ac7c6fca407eaf8973aa9cb26afd6a582cd003")
 
-# 26 Platform ve Doğrulama Kuralları
 SITES = {
     "Instagram": {
         "url": "https://www.instagram.com/{}/",
@@ -76,14 +75,12 @@ def detect_platform(url: str):
     else:
         return {"name": "Web Kaynağı", "icon": "fa-solid fa-globe", "color": "text-slate-400 bg-slate-800 border-slate-700"}
 
-# EXIF Meta Veri Çıkarıcı
 def extract_metadata(image_bytes: bytes):
     meta = {}
     try:
         image = Image.open(io.BytesIO(image_bytes))
         meta["Format"] = image.format
-        meta["Boyut"] = f"{image.width}x{image.height} px"
-        
+        meta["Çözünürlük"] = f"{image.width}x{image.height} px"
         exif = image.getexif()
         if exif:
             for tag_id, value in exif.items():
@@ -94,20 +91,18 @@ def extract_metadata(image_bytes: bytes):
         pass
     return meta
 
-# Otomatik Yüz Kırpma Motoru
 def process_face_crop(image_bytes: bytes):
     try:
         nparr = np.frombuffer(image_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if img is None:
-            return image_bytes, False
+            return image_bytes, False, None
         
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=4, minSize=(60, 60))
         
         if len(faces) > 0:
-            # En belirgin yüzü al
             x, y, w, h = max(faces, key=lambda b: b[2] * b[3])
             pad_w = int(w * 0.25)
             pad_h = int(h * 0.25)
@@ -121,10 +116,11 @@ def process_face_crop(image_bytes: bytes):
             cropped = img[y1:y2, x1:x2]
             success, buffer = cv2.imencode('.jpg', cropped)
             if success:
-                return buffer.tobytes(), True
+                crop_b64 = base64.b64encode(buffer).decode('utf-8')
+                return buffer.tobytes(), True, f"data:image/jpeg;base64,{crop_b64}"
     except Exception:
         pass
-    return image_bytes, False
+    return image_bytes, False, None
 
 async def check_site(client: httpx.AsyncClient, name: str, config: dict, username: str):
     target_url = config["url"].format(username)
@@ -158,7 +154,6 @@ async def search_username(username: str):
             yield {"event": "done", "data": json.dumps({"status": "completed"})}
     return EventSourceResponse(event_generator())
 
-# --- GÖRSEL, YÜZ VE METAVERİ ARAMA API ENDPOINT ---
 @app.post("/api/search-image")
 async def search_image(image: UploadFile = File(...)):
     if not SERPAPI_KEY or SERPAPI_KEY == "BURAYA_SERPAPI_KEY_YAZ":
@@ -166,15 +161,10 @@ async def search_image(image: UploadFile = File(...)):
     
     try:
         raw_contents = await image.read()
-        
-        # 1. Meta verileri (EXIF) çıkar
         metadata = extract_metadata(raw_contents)
-        
-        # 2. Yüz algılama ve odak kırpma yap
-        optimized_bytes, face_found = process_face_crop(raw_contents)
+        optimized_bytes, face_found, crop_preview = process_face_crop(raw_contents)
         
         async with httpx.AsyncClient(timeout=25.0) as client:
-            # 3. Optimize edilmiş görseli geçici sunucuya yükle
             upload_res = await client.post(
                 "https://tmpfiles.org/api/v1/upload",
                 files={"file": ("search.jpg", optimized_bytes, "image/jpeg")}
@@ -185,7 +175,6 @@ async def search_image(image: UploadFile = File(...)):
             raw_url = upload_res.json()["data"]["url"]
             direct_image_url = raw_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
 
-            # 4. Google Lens üzerinden görsel eşleşmeleri çek
             serp_url = "https://serpapi.com/search.json"
             params = {
                 "engine": "google_lens",
@@ -205,7 +194,6 @@ async def search_image(image: UploadFile = File(...)):
                 for item in results["visual_matches"]:
                     link = item.get("link", "#")
                     platform_info = detect_platform(link)
-                    
                     matches.append({
                         "title": item.get("title", "İsimsiz Başlık"),
                         "source": item.get("source", "Bilinmeyen Kaynak"),
@@ -220,7 +208,8 @@ async def search_image(image: UploadFile = File(...)):
                 "success": True, 
                 "matches": matches, 
                 "metadata": metadata, 
-                "face_detected": face_found
+                "face_detected": face_found,
+                "crop_preview": crop_preview
             }
             
     except Exception as e:
@@ -230,123 +219,191 @@ async def search_image(image: UploadFile = File(...)):
 async def serve_ui():
     return """
     <!DOCTYPE html>
-    <html lang="tr">
+    <html lang="tr" class="dark">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>TraceSpect | OSINT & Visual Intelligence</title>
+        <title>TraceSpect | Next-Gen OSINT & Visual Intelligence</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛰️</text></svg>">
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+        <style>
+            body { font-family: 'Plus Jakarta Sans', sans-serif; }
+            .font-mono { font-family: 'JetBrains Mono', monospace; }
+            .cyber-grid {
+                background-size: 40px 40px;
+                background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                                  linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            }
+            .glass-panel {
+                background: rgba(15, 23, 42, 0.75);
+                backdrop-filter: blur(16px);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+            }
+            .glass-glow {
+                box-shadow: 0 0 50px -10px rgba(99, 102, 241, 0.15);
+            }
+        </style>
     </head>
-    <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center py-10 px-4 antialiased">
-        <div class="max-w-3xl w-full">
-            
-            <!-- Header -->
-            <div class="text-center mb-6">
-                <div class="inline-flex items-center justify-center p-3.5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl mb-4 text-indigo-400 shadow-inner">
-                    <i class="fa-solid fa-fingerprint text-3xl"></i>
+    <body class="bg-[#070b14] text-slate-100 min-h-screen flex flex-col items-center cyber-grid antialiased selection:bg-indigo-500 selection:text-white">
+        
+        <!-- Navigation Header -->
+        <nav class="w-full border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex justify-between items-center max-w-7xl mx-auto">
+            <div class="flex items-center gap-3">
+                <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid fa-radar text-white text-base"></i>
                 </div>
-                <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mb-2">TraceSpect</h1>
-                <p class="text-slate-400 text-sm sm:text-base">Kullanıcı adı, EXIF meta veri ve yüz analiziyle dijital ayak izi taraması.</p>
+                <div>
+                    <span class="font-extrabold text-lg tracking-tight text-white flex items-center gap-1.5">
+                        TraceSpect <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-mono">v2.0 PRO</span>
+                    </span>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="#sponsor" class="text-xs font-semibold px-3.5 py-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-mug-hot text-amber-400"></i> Destek Ol
+                </a>
+            </div>
+        </nav>
+
+        <main class="max-w-4xl w-full px-4 py-10 flex-1 flex flex-col items-center">
+            
+            <!-- Hero Title -->
+            <div class="text-center mb-8 max-w-2xl">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium mb-4">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    26+ Platform & Derin Yüz Taraması Aktif
+                </div>
+                <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight text-white mb-3">
+                    Dijital Ayak İzini <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Görünür Kılın</span>
+                </h1>
+                <p class="text-slate-400 text-sm sm:text-base leading-relaxed">
+                    Kullanıcı adlarını, EXIF meta verilerini ve yüz biyometrisini açık istihbarat (OSINT) ağlarında eşzamanlı sorgulayın.
+                </p>
             </div>
 
             <!-- Tab Buttons -->
-            <div class="flex justify-center mb-6 bg-slate-900 p-1.5 rounded-xl border border-slate-800 w-fit mx-auto shadow-lg">
-                <button id="tabUsername" onclick="switchTab('username')" class="px-5 py-2.5 rounded-lg text-sm font-medium transition-all bg-indigo-600 text-white flex items-center gap-2">
-                    <i class="fa-solid fa-at"></i> Kullanıcı Adı
+            <div class="flex justify-center mb-6 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800/80 w-fit mx-auto shadow-2xl backdrop-blur-xl">
+                <button id="tabUsername" onclick="switchTab('username')" class="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2">
+                    <i class="fa-solid fa-at"></i> Kullanıcı Adı Analizi
                 </button>
-                <button id="tabImage" onclick="switchTab('image')" class="px-5 py-2.5 rounded-lg text-sm font-medium transition-all text-slate-400 hover:text-white flex items-center gap-2">
-                    <i class="fa-solid fa-camera"></i> Yüz / Görsel OSINT
+                <button id="tabImage" onclick="switchTab('image')" class="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-expand"></i> Yüz & Görsel OSINT
                 </button>
             </div>
 
-            <!-- 1. TAB: USERNAME SEARCH -->
-            <div id="usernameSection">
-                <form id="searchForm" class="bg-slate-900/80 p-2 rounded-2xl border border-slate-800 flex gap-2 mb-6 shadow-xl backdrop-blur-md">
+            <!-- TOP AD BANNER PLACEHOLDER (AdSense İçin Hazır Alan) -->
+            <div class="w-full mb-6 p-3 rounded-xl bg-slate-900/40 border border-slate-800/50 text-center text-slate-600 text-xs font-mono tracking-wider">
+                [ SPONSOR ALANI / REKLAM YERLEŞİMİ ]
+            </div>
+
+            <!-- 1. TAB: USERNAME SECTION -->
+            <div id="usernameSection" class="w-full">
+                <form id="searchForm" class="glass-panel p-2.5 rounded-2xl flex gap-2 mb-6 glass-glow">
                     <div class="relative flex-1">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-500">
-                            <i class="fa-solid fa-magnifying-glass"></i>
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-500 font-mono">
+                            <i class="fa-solid fa-terminal text-indigo-400"></i>
                         </span>
-                        <input type="text" id="usernameInput" placeholder="Hedef kullanıcı adı (örn: torvalds)" required autocomplete="off"
-                            class="w-full bg-transparent pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:outline-none text-sm sm:text-base">
+                        <input type="text" id="usernameInput" placeholder="Hedef kullanıcı adını girin (örn: torvalds)" required autocomplete="off"
+                            class="w-full bg-transparent pl-11 pr-4 py-3 text-white placeholder-slate-500 focus:outline-none text-sm sm:text-base font-mono">
                     </div>
                     <button type="submit" id="submitBtn"
-                        class="bg-indigo-600 hover:bg-indigo-500 font-medium px-6 py-3 rounded-xl transition-all flex items-center gap-2 text-sm sm:text-base shadow-lg shadow-indigo-600/30">
-                        <span>Tara</span>
+                        class="bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 font-semibold px-7 py-3 rounded-xl transition-all flex items-center gap-2 text-sm sm:text-base shadow-lg shadow-indigo-600/30 text-white">
+                        <span>Ağı Tara</span>
                         <i class="fa-solid fa-bolt text-xs"></i>
                     </button>
                 </form>
 
-                <div id="statsSection" class="hidden mb-6 bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
-                    <div class="flex justify-between items-center text-xs font-semibold text-slate-400 mb-2">
-                        <span id="statusText">İz sürülüyor...</span>
-                        <span id="progressText">0%</span>
+                <div id="statsSection" class="hidden mb-6 glass-panel rounded-2xl p-5 shadow-xl">
+                    <div class="flex justify-between items-center text-xs font-mono text-slate-400 mb-2">
+                        <span id="statusText" class="flex items-center gap-2">
+                            <span class="h-2 w-2 rounded-full bg-indigo-500 animate-pulse"></span> Taranıyor...
+                        </span>
+                        <span id="progressText" class="text-indigo-400 font-bold">0%</span>
                     </div>
-                    <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                        <div id="progressBar" class="bg-indigo-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden p-0.5 border border-slate-800">
+                        <div id="progressBar" class="bg-gradient-to-r from-indigo-500 to-cyan-400 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
                     <div class="flex items-center justify-between mt-4 pt-3 border-t border-slate-800/80 text-xs">
-                        <div class="flex gap-4">
-                            <span class="text-slate-400">Aktif Profil: <strong id="foundCount" class="text-emerald-400">0</strong></span>
-                            <span class="text-slate-400">Kayıtsız: <strong id="notFoundCount" class="text-slate-300">0</strong></span>
+                        <div class="flex gap-4 font-mono">
+                            <span class="text-slate-400">Bulunan: <strong id="foundCount" class="text-emerald-400 font-bold">0</strong></span>
+                            <span class="text-slate-400">Kayıtsız: <strong id="notFoundCount" class="text-slate-500">0</strong></span>
                         </div>
                         <div class="flex gap-2">
-                            <button id="filterBtn" class="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-slate-300 transition-colors">
+                            <button id="filterBtn" class="bg-slate-800/80 hover:bg-slate-700 px-3.5 py-1.5 rounded-lg text-slate-300 transition-colors border border-slate-700">
                                 Sadece Bulunanlar
                             </button>
-                            <button id="exportBtn" class="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-slate-300 transition-colors hidden">
-                                <i class="fa-solid fa-file-arrow-down mr-1"></i> CSV İndir
+                            <button id="exportBtn" class="bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/30 px-3.5 py-1.5 rounded-lg text-indigo-300 transition-colors hidden font-semibold">
+                                <i class="fa-solid fa-file-arrow-down mr-1"></i> Raporu İndir
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <div id="results" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+                <div id="results" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
             </div>
 
-            <!-- 2. TAB: IMAGE / FACE SEARCH -->
-            <div id="imageSection" class="hidden">
-                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 mb-6 text-center shadow-xl backdrop-blur-md">
+            <!-- 2. TAB: IMAGE / FACE OSINT SECTION -->
+            <div id="imageSection" class="w-full hidden">
+                <div class="glass-panel rounded-3xl p-8 mb-6 text-center glass-glow">
                     <input type="file" id="imageInput" accept="image/*" class="hidden">
                     <div id="dropZone" onclick="document.getElementById('imageInput').click()" 
-                        class="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-xl p-8 cursor-pointer transition-colors flex flex-col items-center justify-center">
-                        <i class="fa-solid fa-expand text-4xl text-indigo-400 mb-3"></i>
-                        <p class="text-slate-200 font-medium mb-1">Fotoğraf seçin veya sürükleyin</p>
-                        <p class="text-slate-500 text-xs">Yüz algılama ve EXIF meta analizi otomatik uygulanır</p>
+                        class="border-2 border-dashed border-slate-700/80 hover:border-indigo-500/80 bg-slate-950/40 rounded-2xl p-10 cursor-pointer transition-all flex flex-col items-center justify-center group">
+                        <div class="h-16 w-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-4 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-face-viewfinder text-3xl"></i>
+                        </div>
+                        <p class="text-slate-200 font-semibold text-base mb-1">Portre veya Görsel Yükleyin</p>
+                        <p class="text-slate-500 text-xs">Yapay zeka yüzü otomatik kırpar, EXIF meta verilerini ayrıştırır</p>
                     </div>
 
-                    <div id="previewContainer" class="hidden mt-4 flex flex-col items-center">
-                        <img id="imagePreview" src="" class="h-44 rounded-xl object-cover border border-slate-700 mb-3 shadow-lg">
+                    <div id="previewContainer" class="hidden mt-6 flex flex-col items-center">
+                        <div class="flex gap-4 items-center justify-center flex-wrap mb-4">
+                            <div class="text-center">
+                                <span class="text-[11px] text-slate-500 block mb-1 font-mono">Orijinal Fotoğraf</span>
+                                <img id="imagePreview" src="" class="h-36 w-36 rounded-xl object-cover border border-slate-700 shadow-md">
+                            </div>
+                            <div id="cropPreviewBox" class="text-center hidden">
+                                <span class="text-[11px] text-indigo-400 block mb-1 font-mono font-semibold">Odaklanan Yüz</span>
+                                <img id="cropPreviewImg" src="" class="h-36 w-36 rounded-xl object-cover border-2 border-indigo-500 shadow-lg shadow-indigo-500/20">
+                            </div>
+                        </div>
                         <button id="imageSearchBtn" onclick="submitImageSearch()"
-                            class="bg-indigo-600 hover:bg-indigo-500 px-6 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/30">
-                            <span>Analiz Et ve Ağları Tara</span>
-                            <i class="fa-solid fa-radar"></i>
+                            class="bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 px-8 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-xl shadow-indigo-600/30 text-white">
+                            <span>Biyometrik & Web Taraması Başlat</span>
+                            <i class="fa-solid fa-crosshairs"></i>
                         </button>
                     </div>
                 </div>
 
-                <div id="imageSearchStatus" class="hidden text-center text-sm font-medium text-indigo-400 mb-4 animate-pulse">
-                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Yüz odaklanıyor, meta veriler çıkarılıyor ve ağlar taranıyor...
+                <div id="imageSearchStatus" class="hidden text-center text-sm font-mono text-indigo-400 mb-4 animate-pulse">
+                    <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Yüz biyometrisi taranıyor ve web profilleri çekiliyor...
                 </div>
 
-                <!-- EXIF Meta Bilgi Kartı -->
-                <div id="metadataCard" class="hidden mb-6 bg-slate-900/90 border border-indigo-500/30 rounded-xl p-4 text-xs">
-                    <div class="flex items-center gap-2 text-indigo-400 font-semibold mb-2 border-b border-slate-800 pb-2">
-                        <i class="fa-solid fa-circle-info"></i> Fotoğraf Meta Veri Analizi (EXIF)
+                <!-- EXIF METADATA CARD -->
+                <div id="metadataCard" class="hidden mb-6 glass-panel rounded-2xl p-5 text-xs shadow-xl">
+                    <div class="flex items-center gap-2 text-indigo-400 font-bold mb-3 border-b border-slate-800 pb-2.5">
+                        <i class="fa-solid fa-microchip"></i> EXIF Meta Veri Analiz Raporu
                     </div>
-                    <div id="metadataContent" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-slate-300"></div>
+                    <div id="metadataContent" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 font-mono"></div>
                 </div>
 
-                <div id="imageResults" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+                <div id="imageResults" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
             </div>
 
-            <!-- Footer -->
-            <div class="text-center mt-12 text-xs text-slate-600">
-                TraceSpect OSINT Platform &copy; 2026 — Açık Kaynak Dijital İstihbarat Aracı
-            </div>
+        </main>
 
-        </div>
+        <!-- Footer / Legal Info (AdSense Onayı İçin Zorunlu) -->
+        <footer class="w-full border-t border-slate-900 bg-slate-950/80 py-8 px-6 mt-12 text-center text-xs text-slate-500">
+            <div class="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+                <p>TraceSpect Intelligence &copy; 2026. Tüm hakları saklıdır.</p>
+                <div class="flex gap-4">
+                    <a href="#" class="hover:text-slate-400 transition-colors">Gizlilik Politikası</a>
+                    <a href="#" class="hover:text-slate-400 transition-colors">Kullanım Şartları</a>
+                    <a href="#" class="hover:text-slate-400 transition-colors">API & İletişim</a>
+                </div>
+            </div>
+        </footer>
 
         <script>
             function switchTab(tab) {
@@ -355,15 +412,15 @@ async def serve_ui():
                 document.getElementById('imageSection').classList.toggle('hidden', isUser);
                 
                 document.getElementById('tabUsername').className = isUser 
-                    ? 'px-5 py-2.5 rounded-lg text-sm font-medium transition-all bg-indigo-600 text-white flex items-center gap-2'
-                    : 'px-5 py-2.5 rounded-lg text-sm font-medium transition-all text-slate-400 hover:text-white flex items-center gap-2';
+                    ? 'px-6 py-2.5 rounded-xl text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2'
+                    : 'px-6 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2';
                 
                 document.getElementById('tabImage').className = !isUser 
-                    ? 'px-5 py-2.5 rounded-lg text-sm font-medium transition-all bg-indigo-600 text-white flex items-center gap-2'
-                    : 'px-5 py-2.5 rounded-lg text-sm font-medium transition-all text-slate-400 hover:text-white flex items-center gap-2';
+                    ? 'px-6 py-2.5 rounded-xl text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2'
+                    : 'px-6 py-2.5 rounded-xl text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2';
             }
 
-            // USERNAME SCRIPT
+            // USERNAME ENGINE
             const form = document.getElementById('searchForm');
             const input = document.getElementById('usernameInput');
             const resultsDiv = document.getElementById('results');
@@ -434,16 +491,16 @@ async def serve_ui():
                     const card = document.createElement('div');
                     card.dataset.found = data.found;
                     card.className = `result-card p-4 rounded-xl border flex justify-between items-center transition-all ${
-                        data.found ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-slate-900 border-slate-800 opacity-60'
+                        data.found ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-slate-900/60 border-slate-800/80 opacity-50'
                     } ${onlyFoundFilter && !data.found ? 'hidden' : ''}`;
 
                     card.innerHTML = `
                         <div class="overflow-hidden mr-2">
                             <p class="font-semibold text-white truncate text-sm">${data.platform}</p>
-                            ${data.found ? `<a href="${data.url}" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300 truncate block mt-0.5"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Profili Aç</a>` : '<span class="text-xs text-slate-500">Profil Yok / Boşta</span>'}
+                            ${data.found ? `<a href="${data.url}" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300 truncate block mt-0.5"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Profili Doğrula</a>` : '<span class="text-xs text-slate-500 font-mono">Boşta</span>'}
                         </div>
                         <div>
-                            ${data.found ? '<span class="text-[11px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium">Aktif</span>' : '<span class="text-[11px] bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full">Boş</span>'}
+                            ${data.found ? '<span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-mono font-bold">AKTİF</span>' : '<span class="text-[10px] bg-slate-800 text-slate-500 px-2 py-0.5 rounded font-mono">YOK</span>'}
                         </div>
                     `;
                     resultsDiv.appendChild(card);
@@ -465,10 +522,12 @@ async def serve_ui():
                 };
             });
 
-            // IMAGE SCRIPT
+            // IMAGE ENGINE
             const imageInput = document.getElementById('imageInput');
             const previewContainer = document.getElementById('previewContainer');
             const imagePreview = document.getElementById('imagePreview');
+            const cropPreviewBox = document.getElementById('cropPreviewBox');
+            const cropPreviewImg = document.getElementById('cropPreviewImg');
             const imageResults = document.getElementById('imageResults');
             const imageSearchStatus = document.getElementById('imageSearchStatus');
             const imageSearchBtn = document.getElementById('imageSearchBtn');
@@ -481,6 +540,7 @@ async def serve_ui():
                     const reader = new FileReader();
                     reader.onload = (re) => {
                         imagePreview.src = re.target.result;
+                        cropPreviewBox.classList.add('hidden');
                         previewContainer.classList.remove('hidden');
                     };
                     reader.readAsDataURL(file);
@@ -517,35 +577,36 @@ async def serve_ui():
                         return;
                     }
 
-                    // Metadata kartını doldur
+                    if (data.crop_preview) {
+                        cropPreviewImg.src = data.crop_preview;
+                        cropPreviewBox.classList.remove('hidden');
+                    }
+
                     if (data.metadata && Object.keys(data.metadata).length > 0) {
                         metadataCard.classList.remove('hidden');
                         for (const [k, v] of Object.entries(data.metadata)) {
-                            metadataContent.innerHTML += `<div class="bg-slate-950/60 p-2 rounded border border-slate-800"><span class="text-slate-500 block text-[10px]">${k}</span><strong class="text-white">${v}</strong></div>`;
-                        }
-                        if (data.face_detected) {
-                            metadataContent.innerHTML += `<div class="bg-indigo-950/40 p-2 rounded border border-indigo-500/30 col-span-2 sm:col-span-3 text-indigo-300"><i class="fa-solid fa-user-check mr-1"></i> Yüz başarıyla algılandı ve odaklanarak tarandı.</div>`;
+                            metadataContent.innerHTML += `<div class="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800/80"><span class="text-slate-500 block text-[10px] uppercase">${k}</span><strong class="text-slate-200">${v}</strong></div>`;
                         }
                     }
 
                     if (data.matches.length === 0) {
-                        imageResults.innerHTML = '<div class="col-span-2 text-center text-slate-500 py-6">Bu fotoğrafa ait internette eşleşen bir profil veya kaynak bulunamadı.</div>';
+                        imageResults.innerHTML = '<div class="col-span-2 text-center text-slate-500 py-6 font-mono">Eşleşen aktif profil bulunamadı.</div>';
                         return;
                     }
 
                     data.matches.forEach(item => {
                         const card = document.createElement('div');
-                        card.className = 'bg-slate-900 border border-slate-800 hover:border-indigo-500/50 p-4 rounded-xl flex gap-3 items-center transition-all shadow-md';
+                        card.className = 'glass-panel p-4 rounded-xl flex gap-3.5 items-center transition-all hover:border-indigo-500/50 hover:shadow-lg hover:shadow-indigo-500/10';
                         card.innerHTML = `
-                            ${item.thumbnail ? `<img src="${item.thumbnail}" class="w-14 h-14 rounded-lg object-cover bg-slate-800 flex-shrink-0">` : '<div class="w-14 h-14 rounded-lg bg-slate-800 flex items-center justify-center text-slate-600"><i class="fa-solid fa-image"></i></div>'}
+                            ${item.thumbnail ? `<img src="${item.thumbnail}" class="w-14 h-14 rounded-lg object-cover bg-slate-900 border border-slate-800 flex-shrink-0">` : '<div class="w-14 h-14 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600"><i class="fa-solid fa-image"></i></div>'}
                             <div class="overflow-hidden flex-1">
                                 <div class="flex items-center gap-1.5 mb-1">
-                                    <span class="text-[10px] px-2 py-0.5 rounded-full border font-medium flex items-center gap-1 ${item.color}">
+                                    <span class="text-[10px] px-2 py-0.5 rounded-md border font-mono font-semibold flex items-center gap-1 ${item.color}">
                                         <i class="${item.icon}"></i> ${item.platform}
                                     </span>
                                 </div>
                                 <p class="text-white text-xs font-semibold truncate mb-0.5">${item.title}</p>
-                                <a href="${item.link}" target="_blank" class="text-xs text-indigo-400 hover:underline inline-block">Bağlantıyı Aç &rarr;</a>
+                                <a href="${item.link}" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300 font-mono inline-block">Profili Gör &rarr;</a>
                             </div>
                         `;
                         imageResults.appendChild(card);
