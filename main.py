@@ -284,7 +284,7 @@ async def serve_ui():
                     <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
                         <span class="text-[10px] text-slate-500 block uppercase font-mono mb-1">USDT (TRC-20):</span>
                         <div class="flex items-center justify-between gap-2">
-                            <span class="text-xs text-indigo-300 font-mono truncate" id="walletAddr">TLx52H9kLqzNf7G3V8xP9q4A1TraceSpect</span>
+                            <span class="text-xs text-indigo-300 font-mono truncate" id="walletAddr">TJiDsEXVWcbi1UShVUiFaufB1Tt2DViUBG</span>
                             <button onclick="copyWallet()" class="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 text-xs px-2.5 py-1 rounded transition-colors font-mono">
                                 <span id="copyBtnTxt"><i class="fa-solid fa-copy"></i></span>
                             </button>
