@@ -61,6 +61,7 @@ DISPOSABLE_DOMAINS = {
     "getairmail.com", "throwawaymail.com", "temp-mail.org"
 }
 
+# SEO: robots.txt
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots_txt():
     return """User-agent: *
@@ -68,6 +69,12 @@ Allow: /
 Sitemap: https://tracespect.com/sitemap.xml
 """
 
+# GOOGLE ADSENSE: ads.txt
+@app.get("/ads.txt", response_class=PlainTextResponse)
+def ads_txt():
+    return "google.com, pub-6573727477932427, DIRECT, f08c47fec0942fa0\n"
+
+# SEO: sitemap.xml
 @app.get("/sitemap.xml")
 def sitemap_xml():
     xml_content = """<?xml version="1.0" encoding="UTF-8"?>
@@ -92,6 +99,10 @@ def get_article_html(title: str, description: str, content_html: str):
         <title>{title} | TraceSpect Bilgi Merkezi</title>
         <meta name="description" content="{description}">
         <link rel="canonical" href="https://tracespect.com/">
+        
+        <!-- Google AdSense -->
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6573727477932427" crossorigin="anonymous"></script>
+
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -146,7 +157,6 @@ def get_article_html(title: str, description: str, content_html: str):
     </html>
     """
 
-# AD-SENSE UYUMLU 4 REHBER SAYFASI
 @app.get("/rehber/osint-nedir", response_class=HTMLResponse)
 def page_osint_guide():
     content = """
@@ -573,6 +583,9 @@ async def serve_ui():
         <meta name="author" content="TraceSpect Intelligence">
         <meta name="robots" content="index, follow">
         <link rel="canonical" href="https://tracespect.com/">
+
+        <!-- Google AdSense -->
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6573727477932427" crossorigin="anonymous"></script>
 
         <meta property="og:type" content="website">
         <meta property="og:url" content="https://tracespect.com/">
@@ -1385,7 +1398,7 @@ async def serve_ui():
                     privacyTitle: '<i class="fa-solid fa-shield-halved text-indigo-400"></i> 개인정보 처리방침 및 법적 고지',
                     privacyP1: "1. <strong>오픈소스 인텔리전스:</strong> TraceSpect는 공개적으로 색인된 데이터(OSINT)만을 분석합니다.",
                     privacyP2: "2. <strong>데이터 미저장:</strong> 업로드된 사진이나 사용자 검색 기록은 서버에 절대 저장되지 않습니다.",
-                    privacyP3: "3. <strong>책임 한계:</strong> 검색 결과의 활용에 대한責任은 전적으로 사용자 본인에게 있습니다.",
+                    privacyP3: "3. <strong>책임 한계:</strong> 검색 결과의 활용에 대한 책임은 전적으로 사용자 본인에게 있습니다.",
                     privacyUnderstand: "확인했습니다",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> 후원',
                     heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 포괄적 OSINT 네트워크 활성화',
