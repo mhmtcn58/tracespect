@@ -73,6 +73,8 @@ def detect_platform(url: str):
         return {"name": "Reddit", "icon": "fa-brands fa-reddit", "color": "text-orange-400 bg-orange-500/10 border-orange-500/20"}
     elif "vk.com" in url_lower:
         return {"name": "VKontakte", "icon": "fa-brands fa-vk", "color": "text-indigo-400 bg-indigo-500/10 border-indigo-500/20"}
+    elif "telegram" in url_lower or "t.me" in url_lower:
+        return {"name": "Telegram", "icon": "fa-brands fa-telegram", "color": "text-sky-400 bg-sky-500/10 border-sky-500/20"}
     elif "yandex" in url_lower:
         return {"name": "Yandex Facial Index", "icon": "fa-solid fa-bolt", "color": "text-yellow-400 bg-yellow-500/10 border-yellow-500/20"}
     elif "bing" in url_lower:
@@ -99,24 +101,20 @@ def extract_metadata(image_bytes: bytes):
     return meta
 
 def enhance_and_crop_biometrics(image_bytes: bytes):
-    """
-    Biyometrik CLAHE kontrast iyileştirmesi uygular ve yüzü en yüksek 
-    arama motoru başarısı için %20 güvenlik payıyla odaklar.
-    """
     try:
         nparr = np.frombuffer(image_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if img is None:
             return image_bytes, False, None
 
-        # 1. Biyometrik CLAHE Netleştirme (Düşük ışık / parlamayı dengeler)
+        # Biyometrik CLAHE Netleştirme
         lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         cl = clahe.apply(l)
         enhanced_img = cv2.cvtColor(cv2.merge((cl, a, b)), cv2.COLOR_LAB2BGR)
 
-        # 2. Yüz Tespiti
+        # Yüz Tespiti
         gray = cv2.cvtColor(enhanced_img, cv2.COLOR_BGR2GRAY)
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.15, minNeighbors=4, minSize=(60, 60))
@@ -138,7 +136,6 @@ def enhance_and_crop_biometrics(image_bytes: bytes):
                 crop_b64 = base64.b64encode(buffer).decode('utf-8')
                 return buffer.tobytes(), True, f"data:image/jpeg;base64,{crop_b64}"
         else:
-            # Yüz tespit edilemezse netleştirilmiş tam görseli döndür
             success, buffer = cv2.imencode('.jpg', enhanced_img, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
             if success:
                 crop_b64 = base64.b64encode(buffer).decode('utf-8')
@@ -149,15 +146,11 @@ def enhance_and_crop_biometrics(image_bytes: bytes):
     return image_bytes, False, None
 
 def generate_multi_engine_direct_searches(direct_image_url: str):
-    """
-    Kullanıcının yüklediği görseli dünyanın en büyük 4 OSINT görsel 
-    motorunda tek tıkla doğrudan tarayabilmesi için derin bağlantılar üretir.
-    """
     encoded_url = urllib.parse.quote(direct_image_url)
     return [
         {
-            "title": "Yandex Visual Deep Recon (En Güçlü Yüz & Sosyal Medya Motoru)",
-            "source": "Yandex OSINT AI",
+            "title": "Sosyal Medya & Yüz Eşleştirme Derin Taraması (VK, IG, Web)",
+            "source": "Yandex Visual Deep Recon",
             "link": f"https://yandex.com/images/search?rpt=imageview&url={encoded_url}",
             "thumbnail": "",
             "platform": "Yandex Facial Index",
@@ -165,8 +158,8 @@ def generate_multi_engine_direct_searches(direct_image_url: str):
             "color": "text-yellow-400 bg-yellow-500/10 border-yellow-500/20"
         },
         {
-            "title": "Bing Visual Intelligence (LinkedIn, Kurumsal & Forum Taraması)",
-            "source": "Microsoft Bing Visual",
+            "title": "Kurumsal Profiller & LinkedIn / GitHub Eşleşmeleri",
+            "source": "Bing Visual Intelligence",
             "link": f"https://www.bing.com/images/searchbyimage?cbir=sbi&imgurl={encoded_url}",
             "thumbnail": "",
             "platform": "Bing Visual Index",
@@ -174,22 +167,13 @@ def generate_multi_engine_direct_searches(direct_image_url: str):
             "color": "text-teal-400 bg-teal-500/10 border-teal-500/20"
         },
         {
-            "title": "Google Lens Global Web & Profil Analizi",
+            "title": "Google Lens Küresel Sosyal Medya & Dijital Ayak İzi",
             "source": "Google Vision AI",
             "link": f"https://lens.google.com/uploadbyurl?url={encoded_url}",
             "thumbnail": "",
             "platform": "Google Lens Index",
             "icon": "fa-brands fa-google",
             "color": "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
-        },
-        {
-            "title": "Baidu Visual Global Database",
-            "source": "Baidu AI Search",
-            "link": "https://image.baidu.com",
-            "thumbnail": "",
-            "platform": "Web Result",
-            "icon": "fa-solid fa-globe",
-            "color": "text-slate-400 bg-slate-800 border-slate-700"
         }
     ]
 
@@ -232,11 +216,9 @@ async def search_image(image: UploadFile = File(...)):
         raw_contents = await image.read()
         metadata = extract_metadata(raw_contents)
         
-        # Biyometrik iyileştirme ve yüz odaklama
         optimized_bytes, face_found, crop_preview = enhance_and_crop_biometrics(raw_contents)
         
         async with httpx.AsyncClient(timeout=25.0) as client:
-            # Görseli geçici analiz sunucusuna aktar
             upload_res = await client.post(
                 "https://tmpfiles.org/api/v1/upload",
                 files={"file": ("search.jpg", optimized_bytes, "image/jpeg")}
@@ -248,12 +230,9 @@ async def search_image(image: UploadFile = File(...)):
             direct_image_url = raw_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
 
             matches = []
-
-            # 1. Öncelikli Derin OSINT Motorları (Yandex, Bing, Google Lens, Baidu)
             direct_engines = generate_multi_engine_direct_searches(direct_image_url)
             matches.extend(direct_engines)
 
-            # 2. SerpApi Google Lens Otomatik Web Ayrıştırması
             if SERPAPI_KEY and SERPAPI_KEY != "BURAYA_SERPAPI_KEY_YAZ":
                 serp_url = "https://serpapi.com/search.json"
                 params = {
@@ -305,7 +284,6 @@ async def serve_ui():
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-        <!-- PDF Export Motoru -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
         <style>
             body { font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -323,11 +301,32 @@ async def serve_ui():
             .glass-glow {
                 box-shadow: 0 0 50px -10px rgba(99, 102, 241, 0.15);
             }
+            
+            @keyframes scanLine {
+                0% { top: 0%; opacity: 0; }
+                15% { opacity: 1; }
+                85% { opacity: 1; }
+                100% { top: 96%; opacity: 0; }
+            }
+            .biometric-laser {
+                position: absolute;
+                left: 0;
+                right: 0;
+                height: 3px;
+                background: linear-gradient(90deg, transparent, #38bdf8, #818cf8, #38bdf8, transparent);
+                box-shadow: 0 0 15px 3px rgba(56, 189, 248, 0.8), 0 0 30px 6px rgba(129, 140, 248, 0.6);
+                animation: scanLine 2s ease-in-out infinite alternate;
+            }
+            .hud-corner {
+                position: absolute;
+                width: 14px;
+                height: 14px;
+                border-color: #38bdf8;
+            }
         </style>
     </head>
     <body class="bg-[#070b14] text-slate-100 min-h-screen flex flex-col items-center cyber-grid antialiased selection:bg-indigo-500 selection:text-white">
         
-        <!-- 1. MODAL: PAYWALL VIP KİLİT PENCERESİ -->
         <div id="paywallModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
             <div class="glass-panel max-w-md w-full rounded-3xl p-8 text-center shadow-2xl border border-indigo-500/40 relative">
                 <div class="h-16 w-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg shadow-rose-500/20">
@@ -347,7 +346,6 @@ async def serve_ui():
             </div>
         </div>
 
-        <!-- 2. MODAL: DESTEK & BAĞIŞ -->
         <div id="donateModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
             <div class="glass-panel max-w-md w-full rounded-3xl p-6 text-center shadow-2xl border border-indigo-500/40 relative">
                 <div class="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-3 text-2xl">
@@ -371,7 +369,6 @@ async def serve_ui():
             </div>
         </div>
 
-        <!-- 3. MODAL: GİZLİLİK POLİTİKASI -->
         <div id="privacyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
             <div class="glass-panel max-w-lg w-full rounded-3xl p-6 text-left shadow-2xl border border-slate-800 text-xs text-slate-300 max-h-[80vh] overflow-y-auto">
                 <h3 id="i18n_privacyTitle" class="text-lg font-bold text-white mb-3 flex items-center gap-2">
@@ -390,7 +387,6 @@ async def serve_ui():
             </div>
         </div>
 
-        <!-- Navigation Header -->
         <nav class="w-full border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 py-3.5 flex justify-between items-center max-w-7xl mx-auto">
             <div class="flex items-center gap-3">
                 <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -404,7 +400,6 @@ async def serve_ui():
             </div>
             
             <div class="flex items-center gap-2 sm:gap-3">
-                <!-- 8 DİLLİ SEÇİM DROPDOWN -->
                 <div class="relative">
                     <select id="langSelect" onchange="changeLanguage(this.value)" 
                             class="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer font-medium">
@@ -430,11 +425,10 @@ async def serve_ui():
 
         <main class="max-w-4xl w-full px-4 py-8 sm:py-10 flex-1 flex flex-col items-center">
             
-            <!-- Hero Title -->
             <div class="text-center mb-8 max-w-2xl">
                 <div id="i18n_heroBadge" class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium mb-4">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                    26+ Platform & Derin Yüz Taraması Aktif
+                    26+ Platform & Biyometrik Yüz Tanıma Aktif
                 </div>
                 <h1 id="i18n_heroTitle" class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mb-3 leading-tight">
                     Dijital Ayak İzini <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Görünür Kılın</span>
@@ -444,7 +438,6 @@ async def serve_ui():
                 </p>
             </div>
 
-            <!-- Tab Buttons -->
             <div class="flex justify-center mb-6 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800/80 w-fit mx-auto shadow-2xl backdrop-blur-xl">
                 <button id="tabUsername" onclick="switchTab('username')" class="px-5 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2">
                     <i class="fa-solid fa-at"></i> <span id="i18n_tabUser">Kullanıcı Adı Analizi</span>
@@ -454,7 +447,6 @@ async def serve_ui():
                 </button>
             </div>
 
-            <!-- ADSTERRA BANNER REKLAM YERLEŞİM ALANI -->
             <div class="w-full mb-6 flex justify-center items-center overflow-hidden min-h-[90px]">
                 <script type="text/javascript">
                     atOptions = {
@@ -468,7 +460,6 @@ async def serve_ui():
                 <script type="text/javascript" src="https://www.highperformanceformat.com/d9328c8df4720e82a028b8d6a0f4c2ee/invoke.js"></script>
             </div>
 
-            <!-- 1. TAB: USERNAME SECTION -->
             <div id="usernameSection" class="w-full">
                 <form id="searchForm" class="glass-panel p-2.5 rounded-2xl flex gap-2 mb-6 glass-glow">
                     <div class="relative flex-1">
@@ -517,7 +508,6 @@ async def serve_ui():
                 <div id="results" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
             </div>
 
-            <!-- 2. TAB: IMAGE / FACE OSINT SECTION -->
             <div id="imageSection" class="w-full hidden">
                 <div class="glass-panel rounded-3xl p-6 sm:p-8 mb-6 text-center glass-glow">
                     <input type="file" id="imageInput" accept="image/*" class="hidden">
@@ -527,33 +517,47 @@ async def serve_ui():
                             <i class="fa-solid fa-face-viewfinder text-3xl"></i>
                         </div>
                         <p id="i18n_dropTitle" class="text-slate-200 font-semibold text-sm sm:text-base mb-1">Portre veya Görsel Yükleyin</p>
-                        <p id="i18n_dropDesc" class="text-slate-500 text-xs">Yapay zeka yüzü otomatik kırpar, EXIF meta verilerini ayrıştırır</p>
+                        <p id="i18n_dropDesc" class="text-slate-500 text-xs">Yapay zeka yüzü otomatik kırpar, biyometrik iyileştirme yapar ve ağda eşleştirir</p>
                     </div>
 
                     <div id="previewContainer" class="hidden mt-6 flex flex-col items-center">
-                        <div class="flex gap-4 items-center justify-center flex-wrap mb-4">
+                        <div class="flex gap-6 items-center justify-center flex-wrap mb-5">
+                            
                             <div class="text-center">
-                                <span id="i18n_origImg" class="text-[11px] text-slate-500 block mb-1 font-mono">Orijinal Fotoğraf</span>
-                                <img id="imagePreview" src="" class="h-32 w-32 sm:h-36 sm:w-36 rounded-xl object-cover border border-slate-700 shadow-md">
+                                <span id="i18n_origImg" class="text-[11px] text-slate-400 block mb-1.5 font-mono">Biyometrik Hedef</span>
+                                <div class="relative h-36 w-36 sm:h-40 sm:w-40 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 flex items-center justify-center">
+                                    <img id="imagePreview" src="" class="h-full w-full object-cover">
+                                    
+                                    <div class="hud-corner top-2 left-2 border-t-2 border-l-2"></div>
+                                    <div class="hud-corner top-2 right-2 border-t-2 border-r-2"></div>
+                                    <div class="hud-corner bottom-2 left-2 border-b-2 border-l-2"></div>
+                                    <div class="hud-corner bottom-2 right-2 border-b-2 border-r-2"></div>
+                                    
+                                    <div id="biometricLaser" class="biometric-laser"></div>
+                                </div>
                             </div>
+
                             <div id="cropPreviewBox" class="text-center hidden">
-                                <span id="i18n_cropImg" class="text-[11px] text-indigo-400 block mb-1 font-mono font-semibold">Odaklanan Yüz & Biyometri</span>
-                                <img id="cropPreviewImg" src="" class="h-32 w-32 sm:h-36 sm:w-36 rounded-xl object-cover border-2 border-indigo-500 shadow-lg shadow-indigo-500/20">
+                                <span id="i18n_cropImg" class="text-[11px] text-cyan-400 block mb-1.5 font-mono font-semibold">Odaklanan Yüz & Biyometri</span>
+                                <div class="h-36 w-36 sm:h-40 sm:w-40 rounded-2xl overflow-hidden border-2 border-cyan-500 shadow-xl shadow-cyan-500/20 bg-slate-950">
+                                    <img id="cropPreviewImg" src="" class="h-full w-full object-cover">
+                                </div>
                             </div>
                         </div>
+
+                        <div id="biometricLogs" class="hidden text-[11px] font-mono text-cyan-300 bg-slate-950/80 border border-cyan-500/30 px-4 py-2 rounded-xl mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-microchip animate-spin text-cyan-400"></i>
+                            <span id="logText">BIOMETRIC_RECON: Yüz landmark noktaları ve sosyal ağ profilleri taranıyor...</span>
+                        </div>
+
                         <button id="imageSearchBtn" onclick="submitImageSearch()"
-                            class="bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 px-6 sm:px-8 py-3 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-xl shadow-indigo-600/30 text-white">
-                            <span id="i18n_btnImgScan">Biyometrik & Web Taraması Başlat</span>
+                            class="bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:opacity-95 px-6 sm:px-8 py-3.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-xl shadow-indigo-600/30 text-white">
+                            <span id="i18n_btnImgScan">Sosyal Medya & Ağ Taraması Başlat</span>
                             <i class="fa-solid fa-crosshairs"></i>
                         </button>
                     </div>
                 </div>
 
-                <div id="imageSearchStatus" class="hidden text-center text-xs sm:text-sm font-mono text-indigo-400 mb-4 animate-pulse">
-                    <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> <span id="i18n_imgScanning">Yüz biyometrisi taranıyor ve web profilleri çekiliyor...</span>
-                </div>
-
-                <!-- EXIF METADATA CARD -->
                 <div id="metadataCard" class="hidden mb-6 glass-panel rounded-2xl p-5 text-xs shadow-xl">
                     <div class="flex items-center gap-2 text-indigo-400 font-bold mb-3 border-b border-slate-800 pb-2.5">
                         <i class="fa-solid fa-microchip"></i> <span id="i18n_exifTitle">EXIF Meta Veri Analiz Raporu</span>
@@ -566,7 +570,6 @@ async def serve_ui():
 
         </main>
 
-        <!-- Footer / Legal Info -->
         <footer class="w-full border-t border-slate-900 bg-slate-950/80 py-8 px-6 mt-12 text-center text-xs text-slate-500">
             <div class="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
                 <p>TraceSpect Intelligence &copy; 2026. <span id="i18n_footerRights">Tüm hakları saklıdır.</span></p>
@@ -579,7 +582,6 @@ async def serve_ui():
         </footer>
 
         <script>
-            // 8 DİLLİ ÇEVİRİ SÖZLÜĞÜ (i18n)
             const I18N = {
                 tr: {
                     paywallTitle: "Günlük Limit Doldu",
@@ -595,7 +597,7 @@ async def serve_ui():
                     privacyP3: "3. <strong>Sorumluluk:</strong> Çıkan sonuçlar kamuya açık verilerin eşleştirilmesidir, arama yapan kullanıcının kendi sorumluluğundadır.",
                     privacyUnderstand: "Anladım",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Destek Ol',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ Platform & Derin Yüz Taranıyor',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ Platform & Biyometrik Yüz Tanıma Aktif',
                     heroTitle: 'Dijital Ayak İzini <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Görünür Kılın</span>',
                     heroDesc: "Kullanıcı adlarını, EXIF meta verilerini ve yüz biyometrisini açık istihbarat (OSINT) ağlarında eşzamanlı sorgulayın.",
                     tabUser: "Kullanıcı Adı Analizi",
@@ -609,11 +611,10 @@ async def serve_ui():
                     filterAll: "Tümünü Göster",
                     pdfBtn: "PDF Raporu İndir",
                     dropTitle: "Portre veya Görsel Yükleyin",
-                    dropDesc: "Yapay zeka yüzü otomatik kırpar, EXIF meta verilerini ayrıştırır",
-                    origImg: "Orijinal Fotoğraf",
+                    dropDesc: "Yapay zeka yüzü otomatik kırpar, biyometrik iyileştirme yapar ve ağda eşleştirir",
+                    origImg: "Biyometrik Hedef",
                     cropImg: "Odaklanan Yüz & Biyometri",
-                    btnImgScan: "Biyometrik & Web Taraması Başlat",
-                    imgScanning: "Yüz biyometrisi taranıyor ve web profilleri çekiliyor...",
+                    btnImgScan: "Sosyal Medya & Ağ Taraması Başlat",
                     exifTitle: "EXIF Meta Veri Analiz Raporu",
                     verifyLink: "Profili Doğrula",
                     statusActive: "AKTİF",
@@ -643,7 +644,7 @@ async def serve_ui():
                     privacyP3: "3. <strong>Disclaimer:</strong> Search results are derived from public indices. Query intent and usage remain the sole responsibility of the user.",
                     privacyUnderstand: "I Understand",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Donate',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ Platforms & Deep Facial Recon Active',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ Platforms & Facial Recon Active',
                     heroTitle: 'Make Your Digital Footprint <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Visible</span>',
                     heroDesc: "Perform concurrent queries across username registries, EXIF telemetry, and biometric facial intelligence.",
                     tabUser: "Username Recon",
@@ -657,11 +658,10 @@ async def serve_ui():
                     filterAll: "Show All",
                     pdfBtn: "Download PDF Report",
                     dropTitle: "Upload a Portrait or Image",
-                    dropDesc: "AI automatically crops faces and extracts hidden EXIF metadata",
-                    origImg: "Original Image",
+                    dropDesc: "AI automatically crops faces and enhances biometric features",
+                    origImg: "Biometric Target",
                     cropImg: "Focused Face & Biometrics",
-                    btnImgScan: "Launch Biometric & Web Recon",
-                    imgScanning: "Scanning facial biometrics and aggregating web profiles...",
+                    btnImgScan: "Launch Social Recon",
                     exifTitle: "EXIF Telemetry Report",
                     verifyLink: "Verify Profile",
                     statusActive: "ACTIVE",
@@ -709,7 +709,6 @@ async def serve_ui():
                     origImg: "Imagen Original",
                     cropImg: "Rostro Enfocado & Biometría",
                     btnImgScan: "Iniciar Escaneo Biométrico",
-                    imgScanning: "Analizando biometría facial y recopilando perfiles...",
                     exifTitle: "Informe de Metadatos EXIF",
                     verifyLink: "Verificar Perfil",
                     statusActive: "ACTIVO",
@@ -757,7 +756,6 @@ async def serve_ui():
                     origImg: "Originalbild",
                     cropImg: "Fokussiertes Gesicht & Biometrie",
                     btnImgScan: "Biometrischen Scan Starten",
-                    imgScanning: "Gesichtsbiometrie wird gescannt...",
                     exifTitle: "EXIF-Metadatenbericht",
                     verifyLink: "Profil Überprüfen",
                     statusActive: "AKTIV",
@@ -805,7 +803,6 @@ async def serve_ui():
                     origImg: "Исходное Фото",
                     cropImg: "Выделенное Лицо & Биометрия",
                     btnImgScan: "Запустить Биометрический Поиск",
-                    imgScanning: "Анализ биометрии и сбор профилей в сети...",
                     exifTitle: "Отчет по Метаданным EXIF",
                     verifyLink: "Открыть Профиль",
                     statusActive: "АКТИВЕН",
@@ -853,7 +850,6 @@ async def serve_ui():
                     origImg: "原始图像",
                     cropImg: "人脸焦点 & 生物特征",
                     btnImgScan: "启动生物特征与全网侦察",
-                    imgScanning: "正在分析人脸生物特征并聚合网络档案...",
                     exifTitle: "EXIF 遥测数据报告",
                     verifyLink: "查看档案",
                     statusActive: "有效",
@@ -901,7 +897,6 @@ async def serve_ui():
                     origImg: "元の画像",
                     cropImg: "検出された顔 & 生体認証",
                     btnImgScan: "生体認証＆Webスキャンを開始",
-                    imgScanning: "顔認証データをスキャンし、プロファイルを収集しています...",
                     exifTitle: "EXIFメタデータレポート",
                     verifyLink: "プロファイルを確認",
                     statusActive: "有効",
@@ -949,7 +944,6 @@ async def serve_ui():
                     origImg: "원본 이미지",
                     cropImg: "감지된 안면 & 생체 정보",
                     btnImgScan: "생체 인식 & 웹 정찰 시작",
-                    imgScanning: "안면 생체 정보를 스캔하고 프로필을 집계하는 중입니다...",
                     exifTitle: "EXIF 메타데이터 분석 보고서",
                     verifyLink: "프로필 확인",
                     statusActive: "활성",
@@ -1010,7 +1004,6 @@ async def serve_ui():
                 document.getElementById('i18n_origImg').innerText = dict.origImg;
                 document.getElementById('i18n_cropImg').innerText = dict.cropImg;
                 document.getElementById('i18n_btnImgScan').innerText = dict.btnImgScan;
-                document.getElementById('i18n_imgScanning').innerText = dict.imgScanning;
                 document.getElementById('i18n_exifTitle').innerText = dict.exifTitle;
                 
                 document.getElementById('i18n_footerRights').innerText = dict.footerRights;
@@ -1020,7 +1013,6 @@ async def serve_ui():
                 document.getElementById('filterBtn').innerText = onlyFoundFilter ? dict.filterAll : dict.filterOnlyFound;
             }
 
-            // GÜNLÜK 2 ARAMA LİMİTİ KONTROLÜ
             function checkLimit() {
                 const today = new Date().toISOString().slice(0, 10);
                 if (localStorage.getItem('ts_date') !== today) {
@@ -1059,7 +1051,6 @@ async def serve_ui():
                     : 'px-5 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2';
             }
 
-            // USERNAME ENGINE
             const form = document.getElementById('searchForm');
             const input = document.getElementById('usernameInput');
             const resultsDiv = document.getElementById('results');
@@ -1078,7 +1069,7 @@ async def serve_ui():
             let currentTargetUser = "";
 
             filterBtn.addEventListener('click', () => {
-                const dict = I18N[CURRENT_LANG];
+                const dict = I18N[CURRENT_LANG] || I18N['tr'];
                 onlyFoundFilter = !onlyFoundFilter;
                 filterBtn.innerText = onlyFoundFilter ? dict.filterAll : dict.filterOnlyFound;
                 filterBtn.classList.toggle('bg-indigo-600', onlyFoundFilter);
@@ -1099,16 +1090,15 @@ async def serve_ui():
                 document.body.removeChild(link);
             });
 
-            // ÇOK DİLLİ ADLİ & İSTİHBARAT PDF RAPOR MOTORU
             function exportPDF() {
-                const dict = I18N[CURRENT_LANG];
+                const dict = I18N[CURRENT_LANG] || I18N['tr'];
                 const caseId = 'TS-' + Math.floor(100000 + Math.random() * 900000);
                 const element = document.createElement('div');
                 element.innerHTML = `
                     <div style="font-family: Arial, sans-serif; padding: 30px; color: #0f172a; background: #ffffff; line-height: 1.5;">
                         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4f46e5; padding-bottom: 15px; margin-bottom: 20px;">
                             <div>
-                                <h1 style="color: #4f46e5; margin: 0; font-size: 22px; font-weight: bold; letter-spacing: -0.5px;">${dict.pdfHeader}</h1>
+                                <h1 style="color: #4f46e5; margin: 0; font-size: 22px; font-weight: bold;">${dict.pdfHeader}</h1>
                                 <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b;">${dict.pdfSub}</p>
                             </div>
                             <div style="text-align: right; font-size: 11px; color: #64748b;">
@@ -1154,10 +1144,6 @@ async def serve_ui():
                                 `).join('')}
                             </tbody>
                         </table>
-
-                        <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 9px; color: #94a3b8; text-align: justify;">
-                            <strong>Disclaimer:</strong> ${dict.pdfLegal}
-                        </div>
                     </div>
                 `;
                 html2pdf().set({ 
@@ -1173,7 +1159,7 @@ async def serve_ui():
                 e.preventDefault();
                 if (!checkLimit()) return;
 
-                const dict = I18N[CURRENT_LANG];
+                const dict = I18N[CURRENT_LANG] || I18N['tr'];
                 const username = input.value.trim();
                 if (!username) return;
                 currentTargetUser = username;
@@ -1243,17 +1229,17 @@ async def serve_ui():
                 };
             });
 
-            // IMAGE ENGINE
             const imageInput = document.getElementById('imageInput');
             const previewContainer = document.getElementById('previewContainer');
             const imagePreview = document.getElementById('imagePreview');
             const cropPreviewBox = document.getElementById('cropPreviewBox');
             const cropPreviewImg = document.getElementById('cropPreviewImg');
             const imageResults = document.getElementById('imageResults');
-            const imageSearchStatus = document.getElementById('imageSearchStatus');
             const imageSearchBtn = document.getElementById('imageSearchBtn');
             const metadataCard = document.getElementById('metadataCard');
             const metadataContent = document.getElementById('metadataContent');
+            const biometricLogs = document.getElementById('biometricLogs');
+            const logText = document.getElementById('logText');
 
             imageInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
@@ -1263,6 +1249,7 @@ async def serve_ui():
                         imagePreview.src = re.target.result;
                         cropPreviewBox.classList.add('hidden');
                         previewContainer.classList.remove('hidden');
+                        biometricLogs.classList.add('hidden');
                     };
                     reader.readAsDataURL(file);
                 }
@@ -1274,14 +1261,16 @@ async def serve_ui():
 
                 if (!checkLimit()) return;
 
-                const dict = I18N[CURRENT_LANG];
+                const dict = I18N[CURRENT_LANG] || I18N['tr'];
                 const formData = new FormData();
                 formData.append('image', file);
 
                 imageResults.innerHTML = '';
                 metadataContent.innerHTML = '';
                 metadataCard.classList.add('hidden');
-                imageSearchStatus.classList.remove('hidden');
+                
+                biometricLogs.classList.remove('hidden');
+                logText.innerText = "BIOMETRIC_RECON: Yüz landmark noktaları ve sosyal ağ profilleri taranıyor...";
                 imageSearchBtn.disabled = true;
                 imageSearchBtn.classList.add('opacity-50');
 
@@ -1292,14 +1281,16 @@ async def serve_ui():
                     });
                     const data = await res.json();
 
-                    imageSearchStatus.classList.add('hidden');
                     imageSearchBtn.disabled = false;
                     imageSearchBtn.classList.remove('opacity-50');
 
                     if (!data.success) {
+                        biometricLogs.classList.add('hidden');
                         alert('Error: ' + data.error);
                         return;
                     }
+
+                    logText.innerText = "BIOMETRIC_RECON: Analiz tamamlandı. Sosyal eşleşmeler listeleniyor.";
 
                     if (data.crop_preview) {
                         cropPreviewImg.src = data.crop_preview;
@@ -1314,7 +1305,7 @@ async def serve_ui():
                     }
 
                     if (data.matches.length === 0) {
-                        imageResults.innerHTML = '<div class="col-span-2 text-center text-slate-500 py-6 font-mono">No matching active profile found.</div>';
+                        imageResults.innerHTML = '<div class="col-span-2 text-center text-slate-500 py-6 font-mono">Eşleşen profil bulunamadı.</div>';
                         return;
                     }
 
@@ -1322,7 +1313,7 @@ async def serve_ui():
                         const card = document.createElement('div');
                         card.className = 'glass-panel p-4 rounded-xl flex gap-3.5 items-center transition-all hover:border-indigo-500/50 hover:shadow-lg hover:shadow-indigo-500/10';
                         card.innerHTML = `
-                            ${item.thumbnail ? `<img src="${item.thumbnail}" class="w-14 h-14 rounded-lg object-cover bg-slate-900 border border-slate-800 flex-shrink-0">` : '<div class="w-14 h-14 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600"><i class="fa-solid fa-image"></i></div>'}
+                            ${item.thumbnail ? `<img src="${item.thumbnail}" class="w-14 h-14 rounded-lg object-cover bg-slate-900 border border-slate-800 flex-shrink-0">` : '<div class="w-14 h-14 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-cyan-400 text-lg"><i class="fa-solid fa-radar"></i></div>'}
                             <div class="overflow-hidden flex-1">
                                 <div class="flex items-center gap-1.5 mb-1">
                                     <span class="text-[10px] px-2 py-0.5 rounded-md border font-mono font-semibold flex items-center gap-1 ${item.color}">
@@ -1337,14 +1328,13 @@ async def serve_ui():
                     });
 
                 } catch (err) {
-                    imageSearchStatus.classList.add('hidden');
+                    biometricLogs.classList.add('hidden');
                     imageSearchBtn.disabled = false;
                     imageSearchBtn.classList.remove('opacity-50');
-                    alert('Error during search.');
+                    alert('Tarama sırasında hata oluştu.');
                 }
             }
 
-            // Sayfa yüklendiğinde hafızadaki dili uygula
             window.addEventListener('DOMContentLoaded', () => {
                 changeLanguage(CURRENT_LANG);
             });
@@ -1356,4 +1346,3 @@ async def serve_ui():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
-    
