@@ -216,7 +216,7 @@ async def search_username(username: str):
             yield {"event": "done", "data": json.dumps({"status": "completed"})}
     return EventSourceResponse(event_generator())
 
-# 1. ADIM: E-POSTA OSINT & GÜVENLİK ANALİZİ ENDPOINT'İ
+# E-POSTA OSINT ENDPOINT'İ
 @app.get("/api/search-email")
 async def search_email(email: str):
     email = email.strip().lower()
@@ -228,7 +228,6 @@ async def search_email(email: str):
     user_part, domain_part = email.split("@", 1)
     is_disposable = domain_part in DISPOSABLE_DOMAINS
     
-    # DNS ve MX kaydı kontrolü
     has_mx = False
     provider = "Özel / Yerel Sunucu"
     try:
@@ -250,7 +249,6 @@ async def search_email(email: str):
     elif "yandex" in domain_part:
         provider = "Yandex 360"
 
-    # OSINT Derin Arama Linkleri
     google_dork = f"https://www.google.com/search?q=%22{urllib.parse.quote(email)}%22"
     github_dork = f"https://github.com/search?q=%22{urllib.parse.quote(email)}%22&type=code"
     hibp_link = f"https://haveibeenpwned.com/account/{urllib.parse.quote(email)}"
@@ -268,6 +266,80 @@ async def search_email(email: str):
             {"name": "HaveIBeenPwned (Veri İhlali Sorgusu)", "url": hibp_link, "icon": "fa-solid fa-triangle-exclamation", "badge": "Güvenlik"},
             {"name": "Google Index Derin Dorking", "url": google_dork, "icon": "fa-brands fa-google", "badge": "Web İzleri"},
             {"name": "GitHub Public Code Leaks", "url": github_dork, "icon": "fa-brands fa-github", "badge": "Kaynak Kodları"}
+        ]
+    }
+
+# 2. ADIM: TELEFON / IP / ALAN ADI OSINT ENDPOINT'İ
+@app.get("/api/search-net")
+async def search_net(query: str):
+    query = query.strip()
+    clean_digits = re.sub(r"[^\d+]", "", query)
+    
+    # 1. Telefon Numarası Kontrolü
+    if (clean_digits.startswith("+") and len(clean_digits) >= 9) or (clean_digits.isdigit() and len(clean_digits) >= 10):
+        country_hint = "Uluslararası / Genel"
+        if clean_digits.startswith("+90") or (len(clean_digits) == 10 and clean_digits.startswith("5")):
+            country_hint = "Türkiye (+90)"
+        elif clean_digits.startswith("+1"):
+            country_hint = "ABD / Kanada (+1)"
+        elif clean_digits.startswith("+44"):
+            country_hint = "Birleşik Krallık (+44)"
+        elif clean_digits.startswith("+49"):
+            country_hint = "Almanya (+49)"
+        elif clean_digits.startswith("+7"):
+            country_hint = "Rusya (+7)"
+
+        wa_link = f"https://wa.me/{clean_digits.replace('+', '')}"
+        tg_link = f"https://t.me/+{clean_digits.replace('+', '')}"
+        truecaller_link = f"https://www.truecaller.com/search/global/{clean_digits.replace('+', '')}"
+        google_phone_dork = f"https://www.google.com/search?q=%22{urllib.parse.quote(query)}%22"
+
+        return {
+            "success": True,
+            "type": "phone",
+            "query": query,
+            "details": {
+                "Format": "Uluslararası Telekom Formatı",
+                "Tahmini Ülke": country_hint,
+                "Temiz Numara": clean_digits
+            },
+            "sources": [
+                {"name": "WhatsApp Doğrudan Sohbet Profili", "url": wa_link, "icon": "fa-brands fa-whatsapp", "badge": "Mesajlaşma"},
+                {"name": "Telegram Kişi / Kanal Eşleşmesi", "url": tg_link, "icon": "fa-brands fa-telegram", "badge": "Mesajlaşma"},
+                {"name": "Truecaller Küresel Kimlik Sorgusu", "url": truecaller_link, "icon": "fa-solid fa-address-book", "badge": "Rehber OSINT"},
+                {"name": "Google Açık Numara İzleri", "url": google_phone_dork, "icon": "fa-brands fa-google", "badge": "Web Dorking"}
+            ]
+        }
+
+    # 2. IP veya Domain Kontrolü
+    clean_domain = query.replace("https://", "").replace("http://", "").split("/")[0].strip()
+    resolved_ip = "Çözümlenemedi"
+    is_live = False
+    try:
+        resolved_ip = socket.gethostbyname(clean_domain)
+        is_live = True
+    except Exception:
+        pass
+
+    shodan_link = f"https://www.shodan.io/host/{resolved_ip if is_live else clean_domain}"
+    whois_link = f"https://who.is/whois/{clean_domain}"
+    censys_link = f"https://search.censys.io/hosts/{resolved_ip if is_live else clean_domain}"
+    crt_link = f"https://crt.sh/?q={urllib.parse.quote(clean_domain)}"
+
+    return {
+        "success": True,
+        "type": "network",
+        "query": clean_domain,
+        "details": {
+            "Hedef": clean_domain,
+            "Çözümlenen IP": resolved_ip,
+            "Sunucu Durumu": "Aktif & Çevrimiçi" if is_live else "Çevrimdışı / Ulaşılamıyor"
+        },
+        "sources": [
+            {"name": "Whois Kayıtları & Registrar Analizi", "url": whois_link, "icon": "fa-solid fa-id-card", "badge": "Sahiplik"},
+            {"name": "Shodan Açık Port & Güvenlik Taraması", "url": shodan_link, "icon": "fa-solid fa-server", "badge": "Altyapı"},
+            {"name": "Censys Tehdit & Sertifika İstihbaratı", "url": censys_link, "icon": "fa-solid fa-shield-halved", "badge": "İstihbarat"},
+            {"name": "crt.sh SSL Şeffaflık & Alt Alan Adları", "url": crt_link, "icon": "fa-solid fa-network-wired", "badge": "Subdomain OSINT"}
         ]
     }
 
@@ -449,7 +521,7 @@ async def serve_ui():
             </div>
         </div>
 
-        <!-- Navigation Header -->
+        <!-- Header -->
         <nav class="w-full border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 py-3 flex justify-between items-center max-w-7xl mx-auto">
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2.5">
@@ -458,7 +530,7 @@ async def serve_ui():
                     </div>
                     <div>
                         <span class="font-extrabold text-base sm:text-lg tracking-tight text-white flex items-center gap-1.5">
-                            TraceSpect <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-mono">v2.1 PRO</span>
+                            TraceSpect <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-mono">v2.2 PRO</span>
                         </span>
                     </div>
                 </div>
@@ -509,7 +581,7 @@ async def serve_ui():
                 <div class="flex items-center justify-center gap-2 flex-wrap mb-4">
                     <div id="i18n_heroBadge" class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium">
                         <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-                        E-Posta, Yüz & Kullanıcı Adı OSINT Aktif
+                        Tam Kapsamlı OSINT İstihbarat Ağı Aktif
                     </div>
                     
                     <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-medium">
@@ -522,20 +594,23 @@ async def serve_ui():
                     Dijital Ayak İzini <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Görünür Kılın</span>
                 </h1>
                 <p id="i18n_heroDesc" class="text-slate-400 text-xs sm:text-base leading-relaxed">
-                    Kullanıcı adlarını, e-posta adreslerini ve biyometrik yüz izlerini açık istihbarat (OSINT) ağlarında eşzamanlı sorgulayın.
+                    Kullanıcı adlarını, e-postaları, telefon numaralarını, IP/Alan adlarını ve yüz biyometrisini açık istihbarat (OSINT) ağlarında eşzamanlı sorgulayın.
                 </p>
             </div>
 
-            <!-- 3'LÜ SEKME MENÜSÜ -->
+            <!-- 4'LÜ SEKME MENÜSÜ -->
             <div class="flex justify-center mb-6 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800/80 w-fit mx-auto shadow-2xl backdrop-blur-xl flex-wrap gap-1">
                 <button id="tabUsername" onclick="switchTab('username')" class="px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2">
                     <i class="fa-solid fa-at"></i> <span id="i18n_tabUser">Kullanıcı Adı</span>
                 </button>
                 <button id="tabEmail" onclick="switchTab('email')" class="px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2">
-                    <i class="fa-solid fa-envelope"></i> <span>E-Posta İstihbaratı</span>
+                    <i class="fa-solid fa-envelope"></i> <span>E-Posta</span>
+                </button>
+                <button id="tabNet" onclick="switchTab('net')" class="px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-phone"></i> <span>Telefon / IP / Domain</span>
                 </button>
                 <button id="tabImage" onclick="switchTab('image')" class="px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2">
-                    <i class="fa-solid fa-expand"></i> <span id="i18n_tabImg">Yüz & Görsel OSINT</span>
+                    <i class="fa-solid fa-expand"></i> <span id="i18n_tabImg">Yüz & Görsel</span>
                 </button>
             </div>
 
@@ -602,7 +677,7 @@ async def serve_ui():
                 <div id="results" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
             </div>
 
-            <!-- 2. TAB: E-POSTA OSINT & İSTİHBARAT BÖLÜMÜ -->
+            <!-- 2. TAB: E-POSTA OSINT -->
             <div id="emailSection" class="w-full hidden">
                 <form id="emailForm" class="glass-panel p-2.5 rounded-2xl flex gap-2 mb-6 glass-glow">
                     <div class="relative flex-1">
@@ -623,7 +698,6 @@ async def serve_ui():
                     <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> MX kayıtları, e-posta sağlayıcısı ve sızıntı veri tabanları taranıyor...
                 </div>
 
-                <!-- E-POSTA ANALİZ SONUÇ KARTLARI -->
                 <div id="emailResultCard" class="hidden glass-panel rounded-2xl p-5 mb-6 shadow-xl border border-indigo-500/30">
                     <div class="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
                         <div>
@@ -655,7 +729,46 @@ async def serve_ui():
                 </div>
             </div>
 
-            <!-- 3. TAB: YÜZ & GÖRSEL OSINT -->
+            <!-- 3. TAB: TELEFON / IP / ALAN ADI OSINT -->
+            <div id="netSection" class="w-full hidden">
+                <form id="netForm" class="glass-panel p-2.5 rounded-2xl flex gap-2 mb-6 glass-glow">
+                    <div class="relative flex-1">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-500 font-mono">
+                            <i class="fa-solid fa-network-wired text-indigo-400"></i>
+                        </span>
+                        <input type="text" id="netInput" placeholder="Telefon (+905xx), IP veya Alan Adı (örn: example.com)" required autocomplete="off"
+                            class="w-full bg-transparent pl-11 pr-4 py-3 text-white placeholder-slate-500 focus:outline-none text-xs sm:text-base font-mono">
+                    </div>
+                    <button type="submit" id="netSubmitBtn"
+                        class="bg-gradient-to-r from-teal-600 to-indigo-600 hover:opacity-95 font-semibold px-5 sm:px-7 py-3 rounded-xl transition-all flex items-center gap-2 text-xs sm:text-base shadow-lg shadow-teal-600/30 text-white">
+                        <span>Ağı Tara</span>
+                        <i class="fa-solid fa-satellite-dish text-xs"></i>
+                    </button>
+                </form>
+
+                <div id="netStatus" class="hidden text-center text-xs font-mono text-teal-400 mb-4 animate-pulse">
+                    <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Whois, Shodan, Telekom ve DNS kayıtları sorgulanıyor...
+                </div>
+
+                <div id="netResultCard" class="hidden glass-panel rounded-2xl p-5 mb-6 shadow-xl border border-teal-500/30">
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
+                        <div>
+                            <span class="text-[10px] uppercase font-mono text-slate-500 block">Hedef Sorgu</span>
+                            <strong id="resNetQuery" class="text-white text-base font-mono">+905... / domain.com</strong>
+                        </div>
+                        <span id="resNetTypeBadge" class="text-xs px-3 py-1 rounded-full font-mono font-bold bg-teal-500/10 text-teal-400 border border-teal-500/20">TELEKOM OSINT</span>
+                    </div>
+
+                    <div id="netDetailsGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 font-mono text-xs mb-5"></div>
+
+                    <h4 class="text-xs font-bold text-teal-400 uppercase tracking-wider font-mono mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-crosshairs"></i> Açık İstihbarat & Ağ Kaynakları
+                    </h4>
+                    <div id="netSourcesList" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- 4. TAB: YÜZ & GÖRSEL OSINT -->
             <div id="imageSection" class="w-full hidden">
                 <div class="glass-panel rounded-3xl p-6 sm:p-8 mb-6 text-center glass-glow">
                     <input type="file" id="imageInput" accept="image/*" class="hidden">
@@ -750,11 +863,11 @@ async def serve_ui():
                     privacyP3: "3. <strong>Sorumluluk:</strong> Çıkan sonuçlar kamuya açık verilerin eşleştirilmesidir, arama yapan kullanıcının kendi sorumluluğundadır.",
                     privacyUnderstand: "Anladım",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Destek Ol',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> E-Posta, Yüz & Kullanıcı Adı OSINT Aktif',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Tam Kapsamlı OSINT İstihbarat Ağı Aktif',
                     heroTitle: 'Dijital Ayak İzini <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Görünür Kılın</span>',
-                    heroDesc: "Kullanıcı adlarını, e-posta adreslerini ve biyometrik yüz izlerini açık istihbarat (OSINT) ağlarında eşzamanlı sorgulayın.",
+                    heroDesc: "Kullanıcı adlarını, e-postaları, telefon numaralarını, IP/Alan adlarını ve yüz biyometrisini açık istihbarat (OSINT) ağlarında eşzamanlı sorgulayın.",
                     tabUser: "Kullanıcı Adı",
-                    tabImg: "Yüz & Görsel OSINT",
+                    tabImg: "Yüz & Görsel",
                     userInputPlaceholder: "Hedef kullanıcı adını girin (örn: torvalds)",
                     btnScan: "Ağı Tara",
                     scanningTxt: "Taranıyor...",
@@ -797,11 +910,11 @@ async def serve_ui():
                     privacyP3: "3. <strong>Disclaimer:</strong> Search results are derived from public indices. Query intent and usage remain the sole responsibility of the user.",
                     privacyUnderstand: "I Understand",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Donate',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Email, Face & Username OSINT Active',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Comprehensive OSINT Network Active',
                     heroTitle: 'Make Your Digital Footprint <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Visible</span>',
-                    heroDesc: "Perform concurrent queries across username registries, email intelligence, and biometric facial reconnaissance.",
-                    tabUser: "Username Recon",
-                    tabImg: "Facial & Visual OSINT",
+                    heroDesc: "Perform concurrent queries across usernames, emails, phone numbers, domain/IP telemetry, and biometric facial intelligence.",
+                    tabUser: "Username",
+                    tabImg: "Face & Visual",
                     userInputPlaceholder: "Enter target username (e.g., torvalds)",
                     btnScan: "Scan Network",
                     scanningTxt: "Scanning...",
@@ -844,11 +957,11 @@ async def serve_ui():
                     privacyP3: "3. <strong>Responsabilidad:</strong> El uso de esta herramienta es responsabilidad exclusiva del usuario.",
                     privacyUnderstand: "Entendido",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Donar',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Email, Rostro y Usuario OSINT Activo',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Red OSINT Integral Activa',
                     heroTitle: 'Haz Visible tu <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Huella Digital</span>',
-                    heroDesc: "Consulta simultáneamente registros de usuarios, telemetría EXIF e inteligencia biométrica.",
+                    heroDesc: "Consulta simultáneamente registros de usuarios, correos, teléfonos, IP/dominios y biometría facial.",
                     tabUser: "Usuario",
-                    tabImg: "OSINT Facial",
+                    tabImg: "Rostro OSINT",
                     userInputPlaceholder: "Introduce el usuario objetivo",
                     btnScan: "Escanear Red",
                     scanningTxt: "Escaneando...",
@@ -891,9 +1004,9 @@ async def serve_ui():
                     privacyP3: "3. <strong>Haftung:</strong> Die Nutzung liegt in der alleinigen Verantwortung des Nutzers.",
                     privacyUnderstand: "Verstanden",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Spenden',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Email, Gesicht & Benutzername OSINT Aktiv',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Vollständiges OSINT-Netzwerk Aktiv',
                     heroTitle: 'Machen Sie Ihren Digitalen <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Fußabdruck Sichtbar</span>',
-                    heroDesc: "Gleichzeitige Abfragen über Benutzernamen, EXIF-Metadaten und biometrische Gesichtserkennung.",
+                    heroDesc: "Gleichzeitige Abfragen über Benutzernamen, E-Mails, Telefonnummern, IP/Domains und Gesichtserkennung.",
                     tabUser: "Benutzer",
                     tabImg: "Gesichts-OSINT",
                     userInputPlaceholder: "Ziel-Benutzernamen eingeben",
@@ -938,9 +1051,9 @@ async def serve_ui():
                     privacyP3: "3. <strong>Ответственность:</strong> Пользователь несет личную ответственность за использование результатов.",
                     privacyUnderstand: "Понятно",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Донат',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Email, Лицо и Никнейм OSINT',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Полная Сеть OSINT Активна',
                     heroTitle: 'Сделайте Цифровой След <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Видимым</span>',
-                    heroDesc: "Мгновенный поиск по никнеймам, метаданным EXIF и биометрии лиц.",
+                    heroDesc: "Мгновенный поиск по никнеймам, email, номерам телефонов, IP/доменам и биометрии лиц.",
                     tabUser: "Никнейм",
                     tabImg: "OSINT по Фото",
                     userInputPlaceholder: "Введите целевой никнейм",
@@ -985,10 +1098,10 @@ async def serve_ui():
                     privacyP3: "3. <strong>责任声明:</strong> 检索结果均来自公开网络，使用者自行承担使用责任。",
                     privacyUnderstand: "我已知晓",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> 赞助',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 邮箱、人脸与用户名 OSINT 已激活',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 全功能 OSINT 情报网络已就绪',
                     heroTitle: '让您的数字足迹 <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">一览无余</span>',
-                    heroDesc: "跨用户名注册库、EXIF 遥测数据及人脸生物特征进行多维度情报查询。",
-                    tabUser: "用户名分析",
+                    heroDesc: "跨用户名、邮箱、电话号码、IP/域名及人脸生物特征进行全网情报侦察。",
+                    tabUser: "用户名",
                     tabImg: "人脸 OSINT",
                     userInputPlaceholder: "输入目标用户名",
                     btnScan: "扫描网络",
@@ -1032,9 +1145,9 @@ async def serve_ui():
                     privacyP3: "3. <strong>免責事項:</strong> 検索結果の利用はユーザー自身の責任となります。",
                     privacyUnderstand: "了解しました",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> 支援',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> メール・顔・ユーザー名 OSINT 有効',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 総合OSINTインテリジェンス有効',
                     heroTitle: 'デジタルフットプリントを <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">可視化する</span>',
-                    heroDesc: "ユーザー名、EXIFメタデータ、顔認証による総合的な公開インテリジェンス調査。",
+                    heroDesc: "ユーザー名、メール、電話番号、IP/ドメイン、顔認証による総合的な公開インテリジェンス調査。",
                     tabUser: "ユーザー名",
                     tabImg: "顔認識OSINT",
                     userInputPlaceholder: "対象のユーザー名を入力",
@@ -1079,9 +1192,9 @@ async def serve_ui():
                     privacyP3: "3. <strong>책임 한계:</strong> 검색 결과의 활용에 대한 책임은 전적으로 사용자 본인에게 있습니다.",
                     privacyUnderstand: "확인했습니다",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> 후원',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 이메일, 안면 & 사용자명 OSINT 활성화',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 포괄적 OSINT 네트워크 활성화',
                     heroTitle: '디지털 발자국을 <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">시각화하세요</span>',
-                    heroDesc: "사용자 이름, EXIF 메타데이터 및 안면 생체 인식을 결합한 종합 OSINT 분석 플랫폼.",
+                    heroDesc: "사용자 이름, 이메일, 전화번호, IP/도메인 및 안면 생체 인식을 결합한 종합 OSINT 분석 플랫폼.",
                     tabUser: "사용자명",
                     tabImg: "안면 OSINT",
                     userInputPlaceholder: "대상 사용자명을 입력하세요",
@@ -1205,10 +1318,12 @@ async def serve_ui():
             function switchTab(tab) {
                 const isUser = tab === 'username';
                 const isEmail = tab === 'email';
+                const isNet = tab === 'net';
                 const isImg = tab === 'image';
 
                 document.getElementById('usernameSection').classList.toggle('hidden', !isUser);
                 document.getElementById('emailSection').classList.toggle('hidden', !isEmail);
+                document.getElementById('netSection').classList.toggle('hidden', !isNet);
                 document.getElementById('imageSection').classList.toggle('hidden', !isImg);
                 
                 document.getElementById('tabUsername').className = isUser 
@@ -1216,6 +1331,10 @@ async def serve_ui():
                     : 'px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2';
                 
                 document.getElementById('tabEmail').className = isEmail 
+                    ? 'px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2'
+                    : 'px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2';
+
+                document.getElementById('tabNet').className = isNet 
                     ? 'px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2'
                     : 'px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2';
 
@@ -1403,7 +1522,7 @@ async def serve_ui():
                 };
             });
 
-            // E-POSTA OSINT MOTORU
+            // E-POSTA MOTORU
             const emailForm = document.getElementById('emailForm');
             const emailInput = document.getElementById('emailInput');
             const emailSubmitBtn = document.getElementById('emailSubmitBtn');
@@ -1480,6 +1599,87 @@ async def serve_ui():
                     emailSubmitBtn.disabled = false;
                     emailSubmitBtn.classList.remove('opacity-50');
                     alert('E-posta analizi sırasında hata oluştu.');
+                }
+            });
+
+            // TELEFON / IP / ALAN ADI OSINT MOTORU
+            const netForm = document.getElementById('netForm');
+            const netInput = document.getElementById('netInput');
+            const netSubmitBtn = document.getElementById('netSubmitBtn');
+            const netStatus = document.getElementById('netStatus');
+            const netResultCard = document.getElementById('netResultCard');
+            const resNetQuery = document.getElementById('resNetQuery');
+            const resNetTypeBadge = document.getElementById('resNetTypeBadge');
+            const netDetailsGrid = document.getElementById('netDetailsGrid');
+            const netSourcesList = document.getElementById('netSourcesList');
+
+            netForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!checkLimit()) return;
+
+                const q = netInput.value.trim();
+                if (!q) return;
+
+                netResultCard.classList.add('hidden');
+                netStatus.classList.remove('hidden');
+                netSubmitBtn.disabled = true;
+                netSubmitBtn.classList.add('opacity-50');
+
+                try {
+                    const res = await fetch(`/api/search-net?query=${encodeURIComponent(q)}`);
+                    const data = await res.json();
+
+                    netStatus.classList.add('hidden');
+                    netSubmitBtn.disabled = false;
+                    netSubmitBtn.classList.remove('opacity-50');
+
+                    if (!data.success) {
+                        alert('Hata oluştu.');
+                        return;
+                    }
+
+                    resNetQuery.innerText = data.query;
+                    if (data.type === 'phone') {
+                        resNetTypeBadge.innerText = 'TELEKOM / GSM OSINT';
+                        resNetTypeBadge.className = 'text-xs px-3 py-1 rounded-full font-mono font-bold bg-teal-500/10 text-teal-400 border border-teal-500/20';
+                    } else {
+                        resNetTypeBadge.innerText = 'ALTYAPI & IP OSINT';
+                        resNetTypeBadge.className = 'text-xs px-3 py-1 rounded-full font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20';
+                    }
+
+                    netDetailsGrid.innerHTML = '';
+                    for (const [k, v] of Object.entries(data.details)) {
+                        netDetailsGrid.innerHTML += `
+                            <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                                <span class="text-[10px] text-slate-500 block mb-1">${k}</span>
+                                <strong class="text-slate-200 truncate block">${v}</strong>
+                            </div>
+                        `;
+                    }
+
+                    netSourcesList.innerHTML = '';
+                    data.sources.forEach(src => {
+                        netSourcesList.innerHTML += `
+                            <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-teal-500/40 transition-colors">
+                                <div class="flex items-center gap-2.5">
+                                    <i class="${src.icon} text-teal-400 text-sm"></i>
+                                    <span class="text-white text-xs font-semibold">${src.name}</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">${src.badge}</span>
+                                    <a href="${src.url}" target="_blank" class="text-xs text-teal-400 hover:text-teal-300 font-mono font-semibold">Bağlantıyı Aç &rarr;</a>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    netResultCard.classList.remove('hidden');
+
+                } catch (err) {
+                    netStatus.classList.add('hidden');
+                    netSubmitBtn.disabled = false;
+                    netSubmitBtn.classList.remove('opacity-50');
+                    alert('Ağ analizi sırasında hata oluştu.');
                 }
             });
 
