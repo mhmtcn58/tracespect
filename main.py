@@ -61,7 +61,6 @@ DISPOSABLE_DOMAINS = {
     "getairmail.com", "throwawaymail.com", "temp-mail.org"
 }
 
-# SEO: robots.txt
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots_txt():
     return """User-agent: *
@@ -69,20 +68,157 @@ Allow: /
 Sitemap: https://tracespect.com/sitemap.xml
 """
 
-# SEO: sitemap.xml
 @app.get("/sitemap.xml")
 def sitemap_xml():
     xml_content = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://tracespect.com/</loc>
-    <lastmod>2026-08-17</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
+  <url><loc>https://tracespect.com/</loc><lastmod>2026-08-17</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://tracespect.com/rehber/osint-nedir</loc><lastmod>2026-08-17</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tracespect.com/rehber/dijital-ayak-izi-temizleme</loc><lastmod>2026-08-17</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tracespect.com/rehber/biyometrik-yuz-arama-nasil-calisir</loc><lastmod>2026-08-17</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tracespect.com/rehber/e-posta-guvenligi-ve-veri-sizintilari</loc><lastmod>2026-08-17</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tracespect.com/hakkimizda</loc><lastmod>2026-08-17</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
 </urlset>
 """
     return Response(content=xml_content, media_type="application/xml")
+
+def get_article_html(title: str, description: str, content_html: str):
+    return f"""
+    <!DOCTYPE html>
+    <html lang="tr" class="dark">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{title} | TraceSpect Bilgi Merkezi</title>
+        <meta name="description" content="{description}">
+        <link rel="canonical" href="https://tracespect.com/">
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+        <style>
+            body {{ font-family: 'Plus Jakarta Sans', sans-serif; }}
+            .font-mono {{ font-family: 'JetBrains Mono', monospace; }}
+            .cyber-grid {{
+                background-size: 40px 40px;
+                background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                                  linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            }}
+            .glass-panel {{
+                background: rgba(15, 23, 42, 0.75);
+                backdrop-filter: blur(16px);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+            }}
+        </style>
+    </head>
+    <body class="bg-[#070b14] text-slate-100 min-h-screen flex flex-col items-center cyber-grid antialiased">
+        <nav class="w-full border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 py-3.5 flex justify-between items-center max-w-7xl mx-auto">
+            <a href="/" class="flex items-center gap-2.5">
+                <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid fa-radar text-white text-base"></i>
+                </div>
+                <span class="font-extrabold text-lg tracking-tight text-white flex items-center gap-1.5">
+                    TraceSpect <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-mono">LABS</span>
+                </span>
+            </a>
+            <a href="/" class="text-xs font-semibold px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all">
+                <i class="fa-solid fa-crosshairs mr-1"></i> Canlı Analiz Aracına Dön
+            </a>
+        </nav>
+
+        <main class="max-w-3xl w-full px-4 py-10 flex-1">
+            <article class="glass-panel p-6 sm:p-10 rounded-3xl text-slate-300 leading-relaxed space-y-6">
+                {content_html}
+            </article>
+        </main>
+
+        <footer class="w-full border-t border-slate-900 bg-slate-950/80 py-8 px-6 text-center text-xs text-slate-500">
+            <div class="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+                <p>TraceSpect Intelligence &copy; 2026. Tüm hakları saklıdır.</p>
+                <div class="flex gap-4">
+                    <a href="/" class="hover:text-slate-400">Ana Sayfa</a>
+                    <a href="/rehber/osint-nedir" class="hover:text-slate-400">OSINT Rehberi</a>
+                    <a href="/rehber/dijital-ayak-izi-temizleme" class="hover:text-slate-400">Gizlilik</a>
+                    <a href="/hakkimizda" class="hover:text-slate-400">Hakkımızda</a>
+                </div>
+            </div>
+        </footer>
+    </body>
+    </html>
+    """
+
+# AD-SENSE UYUMLU 4 REHBER SAYFASI
+@app.get("/rehber/osint-nedir", response_class=HTMLResponse)
+def page_osint_guide():
+    content = """
+    <h1 class="text-3xl font-extrabold text-white mb-4">Açık Kaynak İstihbaratı (OSINT) Nedir?</h1>
+    <p class="text-indigo-400 font-mono text-xs">Yayınlanma: Ağustos 2026 | Okuma Süresi: 4 Dk</p>
+    <p>Açık Kaynak İstihbaratı (Open Source Intelligence - OSINT), yasal ve kamuya açık kaynaklardan elde edilen verilerin toplanması, analiz edilmesi ve anlamlı bir istihbarat çıktısına dönüştürülmesi sürecidir.</p>
+    <h2 class="text-xl font-bold text-white mt-6">OSINT Hangi Alanlarda Kullanılır?</h2>
+    <ul class="list-disc pl-5 space-y-2">
+        <li><strong>Siber Güvenlik & Tehdit Avcılığı:</strong> Saldırganların kurumlar hakkında hangi kamuya açık verilere erişebileceğini tespit etmek (Attack Surface Management).</li>
+        <li><strong>Dijital Ayak İzi Denetimi:</strong> Bireylerin internet üzerinde farkında olmadan bıraktıkları kişisel bilgilerin analizi.</li>
+        <li><strong>Gazetecilik & Adli Doğrulama:</strong> Sosyal medya manipülasyonlarını, sahte hesapları ve dijital kanıtları doğrulamak.</li>
+    </ul>
+    <h2 class="text-xl font-bold text-white mt-6">TraceSpect Mimarisi ve OSINT</h2>
+    <p>TraceSpect, hiçbir gizli veya yetkisiz veri tabanına sızmadan, tamamen arama motorlarının ve sosyal medya ağlarının kamuya sunduğu indeksleri makine öğrenimi ve asenkron sorgularla bir araya getirir.</p>
+    """
+    return get_article_html("Açık Kaynak İstihbaratı (OSINT) Nedir?", "OSINT nedir, nasıl yapılır ve siber güvenlikteki önemi nelerdir?", content)
+
+@app.get("/rehber/dijital-ayak-izi-temizleme", response_class=HTMLResponse)
+def page_digital_footprint():
+    content = """
+    <h1 class="text-3xl font-extrabold text-white mb-4">Dijital Ayak İzi Nasıl Temizlenir?</h1>
+    <p class="text-indigo-400 font-mono text-xs">Yayınlanma: Ağustos 2026 | Okuma Süresi: 5 Dk</p>
+    <p>İnternette oluşturduğunuz her hesap, paylaştığınız her görsel ve kullandığınız kullanıcı adları geride kalıcı bir dijital iz bırakır.</p>
+    <h2 class="text-xl font-bold text-white mt-6">Adım Adım Ayak İzinizi Küçültme Rehberi:</h2>
+    <ol class="list-decimal pl-5 space-y-3">
+        <li><strong>Kullanılmayan Hesapları Kapatın:</strong> Eski forumlar, unutulmuş sosyal ağlar ve e-ticaret sitelerindeki hesaplarınızı silin.</li>
+        <li><strong>Arama Motorlarından Veri Kaldırma Talepleri:</strong> Google ve Bing'in sunduğu "Kişisel Bilgileri Kaldırma" formlarını kullanarak indeksleri temizleyin.</li>
+        <li><strong>Farklı Platformlarda Benzersiz Kullanıcı Adı:</strong> Tüm hesaplarınızda aynı takma adı (nickname) kullanmak, profillerinizin çapraz olarak eşleştirilmesini kolaylaştırır.</li>
+        <li><strong>EXIF Meta Verilerini Silin:</strong> Fotoğraf yüklemeden önce konum, kamera modeli ve çekim saati içeren EXIF verilerini temizleyin.</li>
+    </ol>
+    """
+    return get_article_html("Dijital Ayak İzi Temizleme Rehberi", "İnternetteki kişisel verilerinizi ve unutulmuş hesaplarınızı nasıl temizlersiniz?", content)
+
+@app.get("/rehber/biyometrik-yuz-arama-nasil-calisir", response_class=HTMLResponse)
+def page_face_recon_guide():
+    content = """
+    <h1 class="text-3xl font-extrabold text-white mb-4">Tersine Görsel ve Biyometrik Yüz Arama Teknolojileri</h1>
+    <p class="text-indigo-400 font-mono text-xs">Yayınlanma: Ağustos 2026 | Okuma Süresi: 4 Dk</p>
+    <p>Geleneksel arama motorları metin tabanlı arama yaparken, modern görsel OSINT motorları görüntü işleme (Computer Vision) algoritmalarını kullanır.</p>
+    <h2 class="text-xl font-bold text-white mt-6">Biyometrik İyileştirme (CLAHE) Nedir?</h2>
+    <p>TraceSpect, yüklenen fotoğraflardaki parlamaları ve karanlık bölgeleri dengelemek için <em>Contrast Limited Adaptive Histogram Equalization (CLAHE)</em> algoritmasını kullanır. Bu sayede yüzün anahtar biyometrik noktaları (göz mesafesi, burun-çene açısı) netleştirilerek arama doğruluğu artırılır.</p>
+    """
+    return get_article_html("Biyometrik Yüz Arama Nasıl Çalışır?", "Görsel arama motorları ve yüz işleme teknolojilerinin çalışma prensipleri.", content)
+
+@app.get("/rehber/e-posta-guvenligi-ve-veri-sizintilari", response_class=HTMLResponse)
+def page_email_security():
+    content = """
+    <h1 class="text-3xl font-extrabold text-white mb-4">E-Posta Güvenliği ve Veri İhlali Analizi</h1>
+    <p class="text-indigo-400 font-mono text-xs">Yayınlanma: Ağustos 2026 | Okuma Süresi: 4 Dk</p>
+    <p>Büyük platformların maruz kaldığı veri sızıntılarında e-posta adresleri ve şifreler kamuya açık hale gelebilir.</p>
+    <h2 class="text-xl font-bold text-white mt-6">Nasıl Güvende Kalınır?</h2>
+    <ul class="list-disc pl-5 space-y-2">
+        <li><strong>İki Aşamalı Doğrulama (2FA):</strong> SMS yerine TOTP (Google Authenticator, YubiKey) tabanlı kimlik doğrulamayı tercih edin.</li>
+        <li><strong>Geçici E-Posta Kullanımı:</strong> Güvenmediğiniz bülten veya platformlara kaydolurken disposable (geçici) mail servislerinden yararlanın.</li>
+        <li><strong>MX ve DNS Şeffaflığı:</strong> Alan adınıza bağlı e-posta sunucularının SPF, DKIM ve DMARC kayıtlarını düzenli olarak denetleyin.</li>
+    </ul>
+    """
+    return get_article_html("E-Posta Güvenliği ve Veri İhlali Analizi", "E-posta güvenliğinizi nasıl sağlarsınız ve veri sızıntılarını nasıl denetlersiniz?", content)
+
+@app.get("/hakkimizda", response_class=HTMLResponse)
+def page_about():
+    content = """
+    <h1 class="text-3xl font-extrabold text-white mb-4">TraceSpect Hakkında</h1>
+    <p>TraceSpect, açık kaynak istihbarat (OSINT) ve dijital ayak izi analizini herkes için erişilebilir, hızlı ve şeffaf hale getirmek amacıyla geliştirilmiş bağımsız bir araştırma platformudur.</p>
+    <h2 class="text-xl font-bold text-white mt-6">Gizlilik İlkemiz</h2>
+    <p>TraceSpect sıfır veri depolama (Zero-Retention) ilkesiyle çalışır. Sunucularımızda aranan kullanıcı adları, e-posta adresleri veya yüklenen fotoğraflar asla loglanmaz, üçüncü şahıslara aktarılmaz veya saklanmaz.</p>
+    <h2 class="text-xl font-bold text-white mt-6">İletişim & Destek</h2>
+    <p>Soru, öneri ve güvenlik bildirimleriniz için: <a href="mailto:support@tracespect.com" class="text-indigo-400 underline">support@tracespect.com</a></p>
+    """
+    return get_article_html("Hakkımızda", "TraceSpect vizyonu, şeffaflık politikası ve adli istihbarat yaklaşımı.", content)
+
+# ----------------- ANA MOTOR VE UÇ NOKTALAR -----------------
 
 def detect_platform(url: str):
     url_lower = url.lower()
@@ -497,7 +633,7 @@ async def serve_ui():
     </head>
     <body class="bg-[#070b14] text-slate-100 min-h-screen flex flex-col items-center cyber-grid antialiased selection:bg-indigo-500 selection:text-white">
         
-        <!-- Paywall VIP Modal (Lemon Squeezy Bağlantılı) -->
+        <!-- Paywall VIP Modal -->
         <div id="paywallModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
             <div class="glass-panel max-w-md w-full rounded-3xl p-8 text-center shadow-2xl border border-indigo-500/40 relative">
                 <div class="h-16 w-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg shadow-rose-500/20">
@@ -569,7 +705,7 @@ async def serve_ui():
                     </div>
                     <div>
                         <span class="font-extrabold text-base sm:text-lg tracking-tight text-white flex items-center gap-1.5">
-                            TraceSpect <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-mono">v2.3 PRO</span>
+                            TraceSpect <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-mono">v2.4 PRO</span>
                         </span>
                     </div>
                 </div>
@@ -865,6 +1001,30 @@ async def serve_ui():
                 <div id="imageResults" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
             </div>
 
+            <!-- AD-SENSE VE SEO İÇİN ALT REHBER & BİLGİ ALANI -->
+            <div class="w-full mt-12 pt-8 border-t border-slate-900 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <a href="/rehber/osint-nedir" class="glass-panel p-4 rounded-2xl hover:border-indigo-500/40 transition-colors block">
+                    <span class="text-xs font-bold text-indigo-400 block mb-1 font-mono">REHBER 01</span>
+                    <h3 class="text-white text-sm font-semibold mb-1">Açık Kaynak İstihbaratı (OSINT) Nedir?</h3>
+                    <p class="text-slate-400 text-xs">OSINT metodolojisi, siber güvenlik araştırmaları ve dijital iz takibi temelleri.</p>
+                </a>
+                <a href="/rehber/dijital-ayak-izi-temizleme" class="glass-panel p-4 rounded-2xl hover:border-indigo-500/40 transition-colors block">
+                    <span class="text-xs font-bold text-indigo-400 block mb-1 font-mono">REHBER 02</span>
+                    <h3 class="text-white text-sm font-semibold mb-1">Dijital Ayak İzi Nasıl Temizlenir?</h3>
+                    <p class="text-slate-400 text-xs">İnternetteki unutulmuş profillerinizi ve kişisel verilerinizi silme adımları.</p>
+                </a>
+                <a href="/rehber/biyometrik-yuz-arama-nasil-calisir" class="glass-panel p-4 rounded-2xl hover:border-indigo-500/40 transition-colors block">
+                    <span class="text-xs font-bold text-indigo-400 block mb-1 font-mono">REHBER 03</span>
+                    <h3 class="text-white text-sm font-semibold mb-1">Biyometrik Yüz Arama Teknolojisi</h3>
+                    <p class="text-slate-400 text-xs">Görüntü işleme, histogram eşitleme (CLAHE) ve tersine görsel arama ilkeleri.</p>
+                </a>
+                <a href="/rehber/e-posta-guvenligi-ve-veri-sizintilari" class="glass-panel p-4 rounded-2xl hover:border-indigo-500/40 transition-colors block">
+                    <span class="text-xs font-bold text-indigo-400 block mb-1 font-mono">REHBER 04</span>
+                    <h3 class="text-white text-sm font-semibold mb-1">E-Posta Güvenliği & Sızıntı Analizi</h3>
+                    <p class="text-slate-400 text-xs">Veri ihlalleri, MX/DNS şeffaflığı ve iki aşamalı doğrulama önlemleri.</p>
+                </a>
+            </div>
+
         </main>
 
         <footer class="w-full border-t border-slate-900 bg-slate-950/80 py-8 px-6 mt-12 text-center text-xs text-slate-500">
@@ -874,10 +1034,7 @@ async def serve_ui():
                 </div>
                 
                 <div class="flex items-center gap-3">
-                    <a href="https://x.com" target="_blank" class="text-slate-400 hover:text-sky-400 transition-colors text-sm"><i class="fa-brands fa-x-twitter"></i></a>
-                    <a href="https://t.me" target="_blank" class="text-slate-400 hover:text-sky-300 transition-colors text-sm"><i class="fa-brands fa-telegram"></i></a>
-                    <a href="https://github.com" target="_blank" class="text-slate-400 hover:text-indigo-300 transition-colors text-sm"><i class="fa-brands fa-github"></i></a>
-                    <a href="https://discord.com" target="_blank" class="text-slate-400 hover:text-indigo-400 transition-colors text-sm"><i class="fa-brands fa-discord"></i></a>
+                    <a href="/hakkimizda" class="hover:text-slate-400 transition-colors">Hakkımızda</a>
                     <span class="text-slate-700">|</span>
                     <button id="i18n_footerPrivacy" onclick="document.getElementById('privacyModal').classList.remove('hidden')" class="hover:text-slate-400 transition-colors">Gizlilik</button>
                     <button id="i18n_footerTerms" onclick="document.getElementById('privacyModal').classList.remove('hidden')" class="hover:text-slate-400 transition-colors">Şartlar</button>
@@ -1228,7 +1385,7 @@ async def serve_ui():
                     privacyTitle: '<i class="fa-solid fa-shield-halved text-indigo-400"></i> 개인정보 처리방침 및 법적 고지',
                     privacyP1: "1. <strong>오픈소스 인텔리전스:</strong> TraceSpect는 공개적으로 색인된 데이터(OSINT)만을 분석합니다.",
                     privacyP2: "2. <strong>데이터 미저장:</strong> 업로드된 사진이나 사용자 검색 기록은 서버에 절대 저장되지 않습니다.",
-                    privacyP3: "3. <strong>책임 한계:</strong> 검색 결과의 활용에 대한 책임은 전적으로 사용자 본인에게 있습니다.",
+                    privacyP3: "3. <strong>책임 한계:</strong> 검색 결과의 활용에 대한責任은 전적으로 사용자 본인에게 있습니다.",
                     privacyUnderstand: "확인했습니다",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> 후원',
                     heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 포괄적 OSINT 네트워크 활성화',
