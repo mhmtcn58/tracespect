@@ -107,14 +107,12 @@ def enhance_and_crop_biometrics(image_bytes: bytes):
         if img is None:
             return image_bytes, False, None
 
-        # Biyometrik CLAHE Netleştirme
         lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         cl = clahe.apply(l)
         enhanced_img = cv2.cvtColor(cv2.merge((cl, a, b)), cv2.COLOR_LAB2BGR)
 
-        # Yüz Tespiti
         gray = cv2.cvtColor(enhanced_img, cv2.COLOR_BGR2GRAY)
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.15, minNeighbors=4, minSize=(60, 60))
@@ -215,7 +213,6 @@ async def search_image(image: UploadFile = File(...)):
     try:
         raw_contents = await image.read()
         metadata = extract_metadata(raw_contents)
-        
         optimized_bytes, face_found, crop_preview = enhance_and_crop_biometrics(raw_contents)
         
         async with httpx.AsyncClient(timeout=25.0) as client:
@@ -301,7 +298,6 @@ async def serve_ui():
             .glass-glow {
                 box-shadow: 0 0 50px -10px rgba(99, 102, 241, 0.15);
             }
-            
             @keyframes scanLine {
                 0% { top: 0%; opacity: 0; }
                 15% { opacity: 1; }
@@ -327,6 +323,7 @@ async def serve_ui():
     </head>
     <body class="bg-[#070b14] text-slate-100 min-h-screen flex flex-col items-center cyber-grid antialiased selection:bg-indigo-500 selection:text-white">
         
+        <!-- Paywall Modal -->
         <div id="paywallModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
             <div class="glass-panel max-w-md w-full rounded-3xl p-8 text-center shadow-2xl border border-indigo-500/40 relative">
                 <div class="h-16 w-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg shadow-rose-500/20">
@@ -346,6 +343,7 @@ async def serve_ui():
             </div>
         </div>
 
+        <!-- Destek Modalı -->
         <div id="donateModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
             <div class="glass-panel max-w-md w-full rounded-3xl p-6 text-center shadow-2xl border border-indigo-500/40 relative">
                 <div class="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-3 text-2xl">
@@ -369,6 +367,7 @@ async def serve_ui():
             </div>
         </div>
 
+        <!-- Gizlilik Modalı -->
         <div id="privacyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
             <div class="glass-panel max-w-lg w-full rounded-3xl p-6 text-left shadow-2xl border border-slate-800 text-xs text-slate-300 max-h-[80vh] overflow-y-auto">
                 <h3 id="i18n_privacyTitle" class="text-lg font-bold text-white mb-3 flex items-center gap-2">
@@ -387,22 +386,51 @@ async def serve_ui():
             </div>
         </div>
 
-        <nav class="w-full border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 py-3.5 flex justify-between items-center max-w-7xl mx-auto">
-            <div class="flex items-center gap-3">
-                <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                    <i class="fa-solid fa-radar text-white text-base"></i>
+        <!-- Navigation Header -->
+        <nav class="w-full border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 py-3 flex justify-between items-center max-w-7xl mx-auto">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                        <i class="fa-solid fa-radar text-white text-base"></i>
+                    </div>
+                    <div>
+                        <span class="font-extrabold text-base sm:text-lg tracking-tight text-white flex items-center gap-1.5">
+                            TraceSpect <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-mono">v2.0</span>
+                        </span>
+                    </div>
                 </div>
-                <div>
-                    <span class="font-extrabold text-lg tracking-tight text-white flex items-center gap-1.5">
-                        TraceSpect <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-mono">v2.0 PRO</span>
+
+                <!-- CANLI KULLANICI SAYACI (HEADER) -->
+                <div class="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/90 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
+                    <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
+                    <span><strong id="liveVisitorsHeader">142</strong> Canlı Kullanıcı</span>
                 </div>
             </div>
             
             <div class="flex items-center gap-2 sm:gap-3">
+                <!-- RESMİ SOSYAL MEDYA İKONLARI -->
+                <div class="flex items-center gap-1.5 border-r border-slate-800 pr-2 sm:pr-3 mr-1">
+                    <a href="https://x.com" target="_blank" title="X (Twitter)" class="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-sky-500/50 hover:text-sky-400 text-slate-400 flex items-center justify-center text-xs transition-colors">
+                        <i class="fa-brands fa-x-twitter"></i>
+                    </a>
+                    <a href="https://t.me" target="_blank" title="Telegram Grubu" class="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-sky-400/50 hover:text-sky-300 text-slate-400 flex items-center justify-center text-xs transition-colors">
+                        <i class="fa-brands fa-telegram"></i>
+                    </a>
+                    <a href="https://github" target="_blank" title="GitHub Repository" class="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:text-indigo-300 text-slate-400 flex items-center justify-center text-xs transition-colors">
+                        <i class="fa-brands fa-github"></i>
+                    </a>
+                    <a href="https://discord.com" target="_blank" title="Discord Topluluğu" class="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-indigo-400/50 hover:text-indigo-400 text-slate-400 flex items-center justify-center text-xs transition-colors">
+                        <i class="fa-brands fa-discord"></i>
+                    </a>
+                </div>
+
+                <!-- DİL SEÇİMİ -->
                 <div class="relative">
                     <select id="langSelect" onchange="changeLanguage(this.value)" 
-                            class="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer font-medium">
+                            class="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer font-medium">
                         <option value="tr">🇹🇷 TR</option>
                         <option value="en">🇬🇧 EN</option>
                         <option value="es">🇪🇸 ES</option>
@@ -425,11 +453,21 @@ async def serve_ui():
 
         <main class="max-w-4xl w-full px-4 py-8 sm:py-10 flex-1 flex flex-col items-center">
             
+            <!-- Hero Title & Live Status Badge -->
             <div class="text-center mb-8 max-w-2xl">
-                <div id="i18n_heroBadge" class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium mb-4">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                    26+ Platform & Biyometrik Yüz Tanıma Aktif
+                <div class="flex items-center justify-center gap-2 flex-wrap mb-4">
+                    <div id="i18n_heroBadge" class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                        26+ Platform & Biyometrik Yüz Tanıma
+                    </div>
+                    
+                    <!-- CANLI SAYAÇ ROZETİ (HERO) -->
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-medium">
+                        <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                        <span>Şu an <strong id="liveVisitorsHero">142</strong> kişi devrede</span>
+                    </div>
                 </div>
+
                 <h1 id="i18n_heroTitle" class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mb-3 leading-tight">
                     Dijital Ayak İzini <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Görünür Kılın</span>
                 </h1>
@@ -438,6 +476,7 @@ async def serve_ui():
                 </p>
             </div>
 
+            <!-- Tab Buttons -->
             <div class="flex justify-center mb-6 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800/80 w-fit mx-auto shadow-2xl backdrop-blur-xl">
                 <button id="tabUsername" onclick="switchTab('username')" class="px-5 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2">
                     <i class="fa-solid fa-at"></i> <span id="i18n_tabUser">Kullanıcı Adı Analizi</span>
@@ -447,6 +486,7 @@ async def serve_ui():
                 </button>
             </div>
 
+            <!-- Reklam Alanı -->
             <div class="w-full mb-6 flex justify-center items-center overflow-hidden min-h-[90px]">
                 <script type="text/javascript">
                     atOptions = {
@@ -460,6 +500,7 @@ async def serve_ui():
                 <script type="text/javascript" src="https://www.highperformanceformat.com/d9328c8df4720e82a028b8d6a0f4c2ee/invoke.js"></script>
             </div>
 
+            <!-- 1. TAB: KULLANICI ADI -->
             <div id="usernameSection" class="w-full">
                 <form id="searchForm" class="glass-panel p-2.5 rounded-2xl flex gap-2 mb-6 glass-glow">
                     <div class="relative flex-1">
@@ -508,6 +549,7 @@ async def serve_ui():
                 <div id="results" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
             </div>
 
+            <!-- 2. TAB: YÜZ & GÖRSEL OSINT -->
             <div id="imageSection" class="w-full hidden">
                 <div class="glass-panel rounded-3xl p-6 sm:p-8 mb-6 text-center glass-glow">
                     <input type="file" id="imageInput" accept="image/*" class="hidden">
@@ -527,12 +569,10 @@ async def serve_ui():
                                 <span id="i18n_origImg" class="text-[11px] text-slate-400 block mb-1.5 font-mono">Biyometrik Hedef</span>
                                 <div class="relative h-36 w-36 sm:h-40 sm:w-40 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 flex items-center justify-center">
                                     <img id="imagePreview" src="" class="h-full w-full object-cover">
-                                    
                                     <div class="hud-corner top-2 left-2 border-t-2 border-l-2"></div>
                                     <div class="hud-corner top-2 right-2 border-t-2 border-r-2"></div>
                                     <div class="hud-corner bottom-2 left-2 border-b-2 border-l-2"></div>
                                     <div class="hud-corner bottom-2 right-2 border-b-2 border-r-2"></div>
-                                    
                                     <div id="biometricLaser" class="biometric-laser"></div>
                                 </div>
                             </div>
@@ -570,13 +610,23 @@ async def serve_ui():
 
         </main>
 
+        <!-- Footer -->
         <footer class="w-full border-t border-slate-900 bg-slate-950/80 py-8 px-6 mt-12 text-center text-xs text-slate-500">
             <div class="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-                <p>TraceSpect Intelligence &copy; 2026. <span id="i18n_footerRights">Tüm hakları saklıdır.</span></p>
-                <div class="flex gap-4">
-                    <button id="i18n_footerPrivacy" onclick="document.getElementById('privacyModal').classList.remove('hidden')" class="hover:text-slate-400 transition-colors">Gizlilik Politikası</button>
-                    <button id="i18n_footerTerms" onclick="document.getElementById('privacyModal').classList.remove('hidden')" class="hover:text-slate-400 transition-colors">Kullanım Şartları</button>
-                    <a href="mailto:support@tracespect.com" class="hover:text-slate-400 transition-colors">API & Support</a>
+                <div class="flex flex-col sm:flex-row items-center gap-2 text-center sm:text-left">
+                    <p>TraceSpect Intelligence &copy; 2026. <span id="i18n_footerRights">Tüm hakları saklıdır.</span></p>
+                </div>
+                
+                <!-- FOOTER SOSYAL MEDYA İKONLARI -->
+                <div class="flex items-center gap-3">
+                    <a href="https://x.com" target="_blank" class="text-slate-400 hover:text-sky-400 transition-colors text-sm"><i class="fa-brands fa-x-twitter"></i></a>
+                    <a href="https://t.me" target="_blank" class="text-slate-400 hover:text-sky-300 transition-colors text-sm"><i class="fa-brands fa-telegram"></i></a>
+                    <a href="https://github.com" target="_blank" class="text-slate-400 hover:text-indigo-300 transition-colors text-sm"><i class="fa-brands fa-github"></i></a>
+                    <a href="https://discord.com" target="_blank" class="text-slate-400 hover:text-indigo-400 transition-colors text-sm"><i class="fa-brands fa-discord"></i></a>
+                    <span class="text-slate-700">|</span>
+                    <button id="i18n_footerPrivacy" onclick="document.getElementById('privacyModal').classList.remove('hidden')" class="hover:text-slate-400 transition-colors">Gizlilik</button>
+                    <button id="i18n_footerTerms" onclick="document.getElementById('privacyModal').classList.remove('hidden')" class="hover:text-slate-400 transition-colors">Şartlar</button>
+                    <a href="mailto:support@tracespect.com" class="hover:text-slate-400 transition-colors">Destek</a>
                 </div>
             </div>
         </footer>
@@ -597,7 +647,7 @@ async def serve_ui():
                     privacyP3: "3. <strong>Sorumluluk:</strong> Çıkan sonuçlar kamuya açık verilerin eşleştirilmesidir, arama yapan kullanıcının kendi sorumluluğundadır.",
                     privacyUnderstand: "Anladım",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Destek Ol',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ Platform & Biyometrik Yüz Tanıma Aktif',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ Platform & Biyometrik Yüz Tanıma',
                     heroTitle: 'Dijital Ayak İzini <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Görünür Kılın</span>',
                     heroDesc: "Kullanıcı adlarını, EXIF meta verilerini ve yüz biyometrisini açık istihbarat (OSINT) ağlarında eşzamanlı sorgulayın.",
                     tabUser: "Kullanıcı Adı Analizi",
@@ -962,6 +1012,19 @@ async def serve_ui():
             };
 
             let CURRENT_LANG = localStorage.getItem('ts_lang') || 'tr';
+
+            // DİNAMİK CANLI KULLANICI SAYACI
+            function updateLiveCount() {
+                const baseCount = 138;
+                const randomShift = Math.floor(Math.random() * 9) - 4; // -4 ile +4 arası dalgalanma
+                const currentCount = Math.max(120, baseCount + randomShift);
+                
+                const headerEl = document.getElementById('liveVisitorsHeader');
+                const heroEl = document.getElementById('liveVisitorsHero');
+                if (headerEl) headerEl.innerText = currentCount;
+                if (heroEl) heroEl.innerText = currentCount;
+            }
+            setInterval(updateLiveCount, 6000);
 
             function changeLanguage(lang) {
                 if (!I18N[lang]) return;
@@ -1337,6 +1400,7 @@ async def serve_ui():
 
             window.addEventListener('DOMContentLoaded', () => {
                 changeLanguage(CURRENT_LANG);
+                updateLiveCount();
             });
         </script>
     </body>
