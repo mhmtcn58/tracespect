@@ -100,7 +100,8 @@ def get_article_html(title: str, description: str, content_html: str):
         <meta name="description" content="{description}">
         <link rel="canonical" href="https://tracespect.com/">
         
-        <!-- Google AdSense -->
+        <!-- Google AdSense Meta & Script -->
+        <meta name="google-adsense-account" content="ca-pub-6573727477932427">
         <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6573727477932427" crossorigin="anonymous"></script>
 
         <script src="https://cdn.tailwindcss.com"></script>
@@ -584,7 +585,8 @@ async def serve_ui():
         <meta name="robots" content="index, follow">
         <link rel="canonical" href="https://tracespect.com/">
 
-        <!-- Google AdSense -->
+        <!-- Google AdSense Meta & Script Doğrulaması -->
+        <meta name="google-adsense-account" content="ca-pub-6573727477932427">
         <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6573727477932427" crossorigin="anonymous"></script>
 
         <meta property="og:type" content="website">
