@@ -6,8 +6,8 @@ import base64
 import re
 import socket
 import urllib.parse
-from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, UploadFile, File, Response
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from sse_starlette.sse import EventSourceResponse
 import httpx
 from PIL import Image, ExifTags
@@ -60,6 +60,29 @@ DISPOSABLE_DOMAINS = {
     "yopmail.com", "trashmail.com", "dispostable.com", "mailinator.com",
     "getairmail.com", "throwawaymail.com", "temp-mail.org"
 }
+
+# SEO: robots.txt Uç Noktası
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots_txt():
+    return """User-agent: *
+Allow: /
+Sitemap: https://tracespect.com/sitemap.xml
+"""
+
+# SEO: sitemap.xml Uç Noktası
+@app.get("/sitemap.xml")
+def sitemap_xml():
+    xml_content = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://tracespect.com/</loc>
+    <lastmod>2026-08-17</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
+"""
+    return Response(content=xml_content, media_type="application/xml")
 
 def detect_platform(url: str):
     url_lower = url.lower()
@@ -216,7 +239,6 @@ async def search_username(username: str):
             yield {"event": "done", "data": json.dumps({"status": "completed"})}
     return EventSourceResponse(event_generator())
 
-# E-POSTA OSINT ENDPOINT'İ
 @app.get("/api/search-email")
 async def search_email(email: str):
     email = email.strip().lower()
@@ -269,13 +291,11 @@ async def search_email(email: str):
         ]
     }
 
-# 2. ADIM: TELEFON / IP / ALAN ADI OSINT ENDPOINT'İ
 @app.get("/api/search-net")
 async def search_net(query: str):
     query = query.strip()
     clean_digits = re.sub(r"[^\d+]", "", query)
     
-    # 1. Telefon Numarası Kontrolü
     if (clean_digits.startswith("+") and len(clean_digits) >= 9) or (clean_digits.isdigit() and len(clean_digits) >= 10):
         country_hint = "Uluslararası / Genel"
         if clean_digits.startswith("+90") or (len(clean_digits) == 10 and clean_digits.startswith("5")):
@@ -311,7 +331,6 @@ async def search_net(query: str):
             ]
         }
 
-    # 2. IP veya Domain Kontrolü
     clean_domain = query.replace("https://", "").replace("http://", "").split("/")[0].strip()
     resolved_ip = "Çözümlenemedi"
     is_live = False
@@ -411,12 +430,35 @@ async def serve_ui():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>TraceSpect | Next-Gen OSINT & Visual Intelligence</title>
+        
+        <!-- KAPSAMLI SEO VE ARAMA MOTORU META ETİKETLERİ -->
+        <title>TraceSpect | Açık Kaynak İstihbarat (OSINT) & Biyometrik Yüz Tarama Platformu</title>
+        <meta name="description" content="TraceSpect ile kullanıcı adlarını 26+ sosyal platformda sorgulayın, e-posta sızıntılarını denetleyin, telefon ve IP telemetrisini inceleyin ve biyometrik yüz arama motorlarıyla dijital ayak izinizi analiz edin.">
+        <meta name="keywords" content="OSINT, yüz tarama, biyometrik arama, kullanıcı adı bulucu, e-posta doğrulama, telefon osint, ip whois, dijital istihbarat, tracespect">
+        <meta name="author" content="TraceSpect Intelligence">
+        <meta name="robots" content="index, follow">
+        <link rel="canonical" href="https://tracespect.com/">
+
+        <!-- Open Graph / Facebook / WhatsApp -->
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="https://tracespect.com/">
+        <meta property="og:title" content="TraceSpect | Next-Gen OSINT & Visual Intelligence">
+        <meta property="og:description" content="Kullanıcı adı, e-posta, telefon ve biyometrik yüz izlerini açık istihbarat ağlarında anında analiz edin.">
+        <meta property="og:image" content="https://tracespect.com/static/og-banner.jpg">
+
+        <!-- Twitter Card -->
+        <meta property="twitter:card" content="summary_large_image">
+        <meta property="twitter:url" content="https://tracespect.com/">
+        <meta property="twitter:title" content="TraceSpect | Next-Gen OSINT & Visual Intelligence">
+        <meta property="twitter:description" content="Dijital ayak izinizi görünür kılın. 26+ platform, e-posta, IP ve derin yüz arama motorları devrede.">
+        <meta property="twitter:image" content="https://tracespect.com/static/og-banner.jpg">
+
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛰️</text></svg>">
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+        
         <style>
             body { font-family: 'Plus Jakarta Sans', sans-serif; }
             .font-mono { font-family: 'JetBrains Mono', monospace; }
@@ -530,7 +572,7 @@ async def serve_ui():
                     </div>
                     <div>
                         <span class="font-extrabold text-base sm:text-lg tracking-tight text-white flex items-center gap-1.5">
-                            TraceSpect <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-mono">v2.2 PRO</span>
+                            TraceSpect <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-mono">v2.3 PRO</span>
                         </span>
                     </div>
                 </div>
