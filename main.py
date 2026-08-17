@@ -61,7 +61,7 @@ DISPOSABLE_DOMAINS = {
     "getairmail.com", "throwawaymail.com", "temp-mail.org"
 }
 
-# SEO: robots.txt Uç Noktası
+# SEO: robots.txt
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots_txt():
     return """User-agent: *
@@ -69,7 +69,7 @@ Allow: /
 Sitemap: https://tracespect.com/sitemap.xml
 """
 
-# SEO: sitemap.xml Uç Noktası
+# SEO: sitemap.xml
 @app.get("/sitemap.xml")
 def sitemap_xml():
     xml_content = """<?xml version="1.0" encoding="UTF-8"?>
@@ -431,22 +431,19 @@ async def serve_ui():
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         
-        <!-- KAPSAMLI SEO VE ARAMA MOTORU META ETİKETLERİ -->
         <title>TraceSpect | Açık Kaynak İstihbarat (OSINT) & Biyometrik Yüz Tarama Platformu</title>
-        <meta name="description" content="TraceSpect ile kullanıcı adlarını 26+ sosyal platformda sorgulayın, e-posta sızıntılarını denetleyin, telefon ve IP telemetrisini inceleyin ve biyometrik yüz arama motorlarıyla dijital ayak izinizi analiz edin.">
+        <meta name="description" content="TraceSpect ile kullanıcı adlarını 26+ platformda sorgulayın, e-posta sızıntılarını denetleyin, telefon ve IP telemetrisini inceleyin ve biyometrik yüz arama motorlarıyla dijital ayak izinizi analiz edin.">
         <meta name="keywords" content="OSINT, yüz tarama, biyometrik arama, kullanıcı adı bulucu, e-posta doğrulama, telefon osint, ip whois, dijital istihbarat, tracespect">
         <meta name="author" content="TraceSpect Intelligence">
         <meta name="robots" content="index, follow">
         <link rel="canonical" href="https://tracespect.com/">
 
-        <!-- Open Graph / Facebook / WhatsApp -->
         <meta property="og:type" content="website">
         <meta property="og:url" content="https://tracespect.com/">
         <meta property="og:title" content="TraceSpect | Next-Gen OSINT & Visual Intelligence">
         <meta property="og:description" content="Kullanıcı adı, e-posta, telefon ve biyometrik yüz izlerini açık istihbarat ağlarında anında analiz edin.">
         <meta property="og:image" content="https://tracespect.com/static/og-banner.jpg">
 
-        <!-- Twitter Card -->
         <meta property="twitter:card" content="summary_large_image">
         <meta property="twitter:url" content="https://tracespect.com/">
         <meta property="twitter:title" content="TraceSpect | Next-Gen OSINT & Visual Intelligence">
@@ -500,7 +497,7 @@ async def serve_ui():
     </head>
     <body class="bg-[#070b14] text-slate-100 min-h-screen flex flex-col items-center cyber-grid antialiased selection:bg-indigo-500 selection:text-white">
         
-        <!-- Paywall Modal -->
+        <!-- Paywall VIP Modal (Lemon Squeezy Bağlantılı) -->
         <div id="paywallModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
             <div class="glass-panel max-w-md w-full rounded-3xl p-8 text-center shadow-2xl border border-indigo-500/40 relative">
                 <div class="h-16 w-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg shadow-rose-500/20">
@@ -510,9 +507,9 @@ async def serve_ui():
                 <p id="i18n_paywallDesc" class="text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
                     Günde en fazla 2 ücretsiz tarama yapabilirsiniz. Sınırsız derin web taraması, yüz biyometrisi ve PDF raporlar için VIP erişim sağlayın.
                 </p>
-                <a id="i18n_paywallBtn" href="https://shopier.com/TraceSpectVIP" target="_blank" 
+                <a id="i18n_paywallBtn" href="https://tracespect.lemonsqueezy.com/checkout/buy/899f18a5-5726-49ce-a89e-36a2636d61b1" target="_blank" 
                    class="w-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:opacity-95 transition-all text-white font-bold py-3.5 px-6 rounded-xl block shadow-xl shadow-indigo-600/30 text-sm">
-                    <i class="fa-solid fa-bolt mr-1"></i> Sınırsız VIP Erişim Al (49 TL)
+                    <i class="fa-solid fa-bolt mr-1"></i> Sınırsız VIP Erişim Al
                 </a>
                 <button id="i18n_paywallClose" onclick="document.getElementById('paywallModal').classList.add('hidden')" class="mt-4 text-slate-500 text-xs hover:text-slate-300 transition-colors">
                     Pencereyi Kapat
@@ -611,7 +608,7 @@ async def serve_ui():
                 <button id="i18n_navDonate" onclick="document.getElementById('donateModal').classList.remove('hidden')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 transition-all hidden sm:flex items-center gap-2">
                     <i class="fa-solid fa-mug-hot text-amber-400"></i> Destek Ol
                 </button>
-                <a id="i18n_navVip" href="https://shopier.com/TraceSpectVIP" target="_blank" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/30 text-indigo-300 transition-all flex items-center gap-1.5">
+                <a id="i18n_navVip" href="https://tracespect.lemonsqueezy.com/checkout/buy/899f18a5-5726-49ce-a89e-36a2636d61b1" target="_blank" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/30 text-indigo-300 transition-all flex items-center gap-1.5">
                     <i class="fa-solid fa-crown text-amber-400"></i> VIP
                 </a>
             </div>
@@ -894,7 +891,7 @@ async def serve_ui():
                 tr: {
                     paywallTitle: "Günlük Limit Doldu",
                     paywallDesc: "Günde en fazla 2 ücretsiz tarama yapabilirsiniz. Sınırsız derin web taraması, yüz biyometrisi ve PDF raporlar için VIP erişim sağlayın.",
-                    paywallBtn: '<i class="fa-solid fa-bolt mr-1"></i> Sınırsız VIP Erişim Al (49 TL)',
+                    paywallBtn: '<i class="fa-solid fa-bolt mr-1"></i> Sınırsız VIP Erişim Al',
                     paywallClose: "Pencereyi Kapat",
                     donateTitle: "Geliştiriciye Destek Ol",
                     donateDesc: "Sunucu masraflarını ve açık kaynak geliştirmeyi destekleyin.",
@@ -941,7 +938,7 @@ async def serve_ui():
                 en: {
                     paywallTitle: "Daily Limit Reached",
                     paywallDesc: "You have reached your limit of 2 free searches per day. Upgrade to VIP for unlimited deep web lookups, facial recon, and PDF exports.",
-                    paywallBtn: '<i class="fa-solid fa-bolt mr-1"></i> Get Unlimited VIP Access ($1.99)',
+                    paywallBtn: '<i class="fa-solid fa-bolt mr-1"></i> Get Unlimited VIP Access',
                     paywallClose: "Close",
                     donateTitle: "Support the Developer",
                     donateDesc: "Help fund server infrastructure and open-source intelligence research.",
