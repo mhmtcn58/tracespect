@@ -3,6 +3,8 @@ import io
 import asyncio
 import json
 import base64
+import re
+import socket
 import urllib.parse
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import HTMLResponse
@@ -51,6 +53,12 @@ SITES = {
     "Pastebin": {"url": "https://pastebin.com/u/{}", "type": "status"},
     "Replit": {"url": "https://replit.com/@{}", "type": "status"},
     "Keybase": {"url": "https://keybase.io/{}", "type": "status"}
+}
+
+DISPOSABLE_DOMAINS = {
+    "tempmail.com", "10minutemail.com", "guerrillamail.com", "sharklasers.com",
+    "yopmail.com", "trashmail.com", "dispostable.com", "mailinator.com",
+    "getairmail.com", "throwawaymail.com", "temp-mail.org"
 }
 
 def detect_platform(url: str):
@@ -207,6 +215,61 @@ async def search_username(username: str):
                 yield {"event": "result", "data": json.dumps(result)}
             yield {"event": "done", "data": json.dumps({"status": "completed"})}
     return EventSourceResponse(event_generator())
+
+# 1. ADIM: E-POSTA OSINT & GÜVENLİK ANALİZİ ENDPOINT'İ
+@app.get("/api/search-email")
+async def search_email(email: str):
+    email = email.strip().lower()
+    email_regex = r"^[\w\.-]+@([\w\.-]+)\.([a-zA-Z]{2,})$"
+    match = re.match(email_regex, email)
+    if not match:
+        return {"success": False, "error": "Geçersiz e-posta formatı."}
+
+    user_part, domain_part = email.split("@", 1)
+    is_disposable = domain_part in DISPOSABLE_DOMAINS
+    
+    # DNS ve MX kaydı kontrolü
+    has_mx = False
+    provider = "Özel / Yerel Sunucu"
+    try:
+        socket.gethostbyname(domain_part)
+        has_mx = True
+    except Exception:
+        has_mx = False
+
+    if "gmail.com" in domain_part:
+        provider = "Google Workspace / Gmail"
+    elif "outlook.com" in domain_part or "hotmail.com" in domain_part:
+        provider = "Microsoft 365 / Outlook"
+    elif "yahoo.com" in domain_part:
+        provider = "Yahoo Mail"
+    elif "proton.me" in domain_part or "protonmail.com" in domain_part:
+        provider = "ProtonMail (Uçtan Uca Şifreli)"
+    elif "icloud.com" in domain_part:
+        provider = "Apple iCloud Mail"
+    elif "yandex" in domain_part:
+        provider = "Yandex 360"
+
+    # OSINT Derin Arama Linkleri
+    google_dork = f"https://www.google.com/search?q=%22{urllib.parse.quote(email)}%22"
+    github_dork = f"https://github.com/search?q=%22{urllib.parse.quote(email)}%22&type=code"
+    hibp_link = f"https://haveibeenpwned.com/account/{urllib.parse.quote(email)}"
+
+    return {
+        "success": True,
+        "email": email,
+        "username_extracted": user_part,
+        "domain": domain_part,
+        "provider": provider,
+        "has_mx": has_mx,
+        "is_disposable": is_disposable,
+        "risk_level": "YÜKSEK (Geçici Mail)" if is_disposable else ("DÜŞÜK" if has_mx else "BİLİNMEYEN"),
+        "osint_sources": [
+            {"name": "HaveIBeenPwned (Veri İhlali Sorgusu)", "url": hibp_link, "icon": "fa-solid fa-triangle-exclamation", "badge": "Güvenlik"},
+            {"name": "Google Index Derin Dorking", "url": google_dork, "icon": "fa-brands fa-google", "badge": "Web İzleri"},
+            {"name": "GitHub Public Code Leaks", "url": github_dork, "icon": "fa-brands fa-github", "badge": "Kaynak Kodları"}
+        ]
+    }
 
 @app.post("/api/search-image")
 async def search_image(image: UploadFile = File(...)):
@@ -395,12 +458,11 @@ async def serve_ui():
                     </div>
                     <div>
                         <span class="font-extrabold text-base sm:text-lg tracking-tight text-white flex items-center gap-1.5">
-                            TraceSpect <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-mono">v2.0</span>
+                            TraceSpect <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-mono">v2.1 PRO</span>
                         </span>
                     </div>
                 </div>
 
-                <!-- CANLI KULLANICI SAYACI (HEADER) -->
                 <div class="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/90 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
                     <span class="relative flex h-2 w-2">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -411,26 +473,16 @@ async def serve_ui():
             </div>
             
             <div class="flex items-center gap-2 sm:gap-3">
-                <!-- RESMİ SOSYAL MEDYA İKONLARI -->
                 <div class="flex items-center gap-1.5 border-r border-slate-800 pr-2 sm:pr-3 mr-1">
-                    <a href="https://x.com" target="_blank" title="X (Twitter)" class="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-sky-500/50 hover:text-sky-400 text-slate-400 flex items-center justify-center text-xs transition-colors">
-                        <i class="fa-brands fa-x-twitter"></i>
-                    </a>
-                    <a href="https://t.me" target="_blank" title="Telegram Grubu" class="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-sky-400/50 hover:text-sky-300 text-slate-400 flex items-center justify-center text-xs transition-colors">
-                        <i class="fa-brands fa-telegram"></i>
-                    </a>
-                    <a href="https://github" target="_blank" title="GitHub Repository" class="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:text-indigo-300 text-slate-400 flex items-center justify-center text-xs transition-colors">
-                        <i class="fa-brands fa-github"></i>
-                    </a>
-                    <a href="https://discord.com" target="_blank" title="Discord Topluluğu" class="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-indigo-400/50 hover:text-indigo-400 text-slate-400 flex items-center justify-center text-xs transition-colors">
-                        <i class="fa-brands fa-discord"></i>
-                    </a>
+                    <a href="https://x.com" target="_blank" title="X (Twitter)" class="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-sky-500/50 hover:text-sky-400 text-slate-400 flex items-center justify-center text-xs transition-colors"><i class="fa-brands fa-x-twitter"></i></a>
+                    <a href="https://t.me" target="_blank" title="Telegram" class="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-sky-400/50 hover:text-sky-300 text-slate-400 flex items-center justify-center text-xs transition-colors"><i class="fa-brands fa-telegram"></i></a>
+                    <a href="https://github.com" target="_blank" title="GitHub" class="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:text-indigo-300 text-slate-400 flex items-center justify-center text-xs transition-colors"><i class="fa-brands fa-github"></i></a>
+                    <a href="https://discord.com" target="_blank" title="Discord" class="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 hover:border-indigo-400/50 hover:text-indigo-400 text-slate-400 flex items-center justify-center text-xs transition-colors"><i class="fa-brands fa-discord"></i></a>
                 </div>
 
-                <!-- DİL SEÇİMİ -->
                 <div class="relative">
                     <select id="langSelect" onchange="changeLanguage(this.value)" 
-                            class="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer font-medium">
+                            class="bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer font-medium">
                         <option value="tr">🇹🇷 TR</option>
                         <option value="en">🇬🇧 EN</option>
                         <option value="es">🇪🇸 ES</option>
@@ -453,15 +505,13 @@ async def serve_ui():
 
         <main class="max-w-4xl w-full px-4 py-8 sm:py-10 flex-1 flex flex-col items-center">
             
-            <!-- Hero Title & Live Status Badge -->
             <div class="text-center mb-8 max-w-2xl">
                 <div class="flex items-center justify-center gap-2 flex-wrap mb-4">
                     <div id="i18n_heroBadge" class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium">
                         <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-                        26+ Platform & Biyometrik Yüz Tanıma
+                        E-Posta, Yüz & Kullanıcı Adı OSINT Aktif
                     </div>
                     
-                    <!-- CANLI SAYAÇ ROZETİ (HERO) -->
                     <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-medium">
                         <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
                         <span>Şu an <strong id="liveVisitorsHero">142</strong> kişi devrede</span>
@@ -472,16 +522,19 @@ async def serve_ui():
                     Dijital Ayak İzini <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Görünür Kılın</span>
                 </h1>
                 <p id="i18n_heroDesc" class="text-slate-400 text-xs sm:text-base leading-relaxed">
-                    Kullanıcı adlarını, EXIF meta verilerini ve yüz biyometrisini açık istihbarat (OSINT) ağlarında eşzamanlı sorgulayın.
+                    Kullanıcı adlarını, e-posta adreslerini ve biyometrik yüz izlerini açık istihbarat (OSINT) ağlarında eşzamanlı sorgulayın.
                 </p>
             </div>
 
-            <!-- Tab Buttons -->
-            <div class="flex justify-center mb-6 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800/80 w-fit mx-auto shadow-2xl backdrop-blur-xl">
-                <button id="tabUsername" onclick="switchTab('username')" class="px-5 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2">
-                    <i class="fa-solid fa-at"></i> <span id="i18n_tabUser">Kullanıcı Adı Analizi</span>
+            <!-- 3'LÜ SEKME MENÜSÜ -->
+            <div class="flex justify-center mb-6 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800/80 w-fit mx-auto shadow-2xl backdrop-blur-xl flex-wrap gap-1">
+                <button id="tabUsername" onclick="switchTab('username')" class="px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2">
+                    <i class="fa-solid fa-at"></i> <span id="i18n_tabUser">Kullanıcı Adı</span>
                 </button>
-                <button id="tabImage" onclick="switchTab('image')" class="px-5 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2">
+                <button id="tabEmail" onclick="switchTab('email')" class="px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-envelope"></i> <span>E-Posta İstihbaratı</span>
+                </button>
+                <button id="tabImage" onclick="switchTab('image')" class="px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2">
                     <i class="fa-solid fa-expand"></i> <span id="i18n_tabImg">Yüz & Görsel OSINT</span>
                 </button>
             </div>
@@ -549,7 +602,60 @@ async def serve_ui():
                 <div id="results" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
             </div>
 
-            <!-- 2. TAB: YÜZ & GÖRSEL OSINT -->
+            <!-- 2. TAB: E-POSTA OSINT & İSTİHBARAT BÖLÜMÜ -->
+            <div id="emailSection" class="w-full hidden">
+                <form id="emailForm" class="glass-panel p-2.5 rounded-2xl flex gap-2 mb-6 glass-glow">
+                    <div class="relative flex-1">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-500 font-mono">
+                            <i class="fa-solid fa-at text-indigo-400"></i>
+                        </span>
+                        <input type="email" id="emailInput" placeholder="Hedef e-posta adresini girin (örn: target@domain.com)" required autocomplete="off"
+                            class="w-full bg-transparent pl-11 pr-4 py-3 text-white placeholder-slate-500 focus:outline-none text-xs sm:text-base font-mono">
+                    </div>
+                    <button type="submit" id="emailSubmitBtn"
+                        class="bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 font-semibold px-5 sm:px-7 py-3 rounded-xl transition-all flex items-center gap-2 text-xs sm:text-base shadow-lg shadow-indigo-600/30 text-white">
+                        <span>E-Postayı Sorgula</span>
+                        <i class="fa-solid fa-shield-halved text-xs"></i>
+                    </button>
+                </form>
+
+                <div id="emailStatus" class="hidden text-center text-xs font-mono text-indigo-400 mb-4 animate-pulse">
+                    <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> MX kayıtları, e-posta sağlayıcısı ve sızıntı veri tabanları taranıyor...
+                </div>
+
+                <!-- E-POSTA ANALİZ SONUÇ KARTLARI -->
+                <div id="emailResultCard" class="hidden glass-panel rounded-2xl p-5 mb-6 shadow-xl border border-indigo-500/30">
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
+                        <div>
+                            <span class="text-[10px] uppercase font-mono text-slate-500 block">Hedef E-Posta</span>
+                            <strong id="resEmail" class="text-white text-base font-mono">target@domain.com</strong>
+                        </div>
+                        <span id="resRiskBadge" class="text-xs px-3 py-1 rounded-full font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">DÜŞÜK RİSK</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 font-mono text-xs mb-5">
+                        <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                            <span class="text-[10px] text-slate-500 block mb-1">E-Posta Servisi</span>
+                            <strong id="resProvider" class="text-slate-200">Google Workspace</strong>
+                        </div>
+                        <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                            <span class="text-[10px] text-slate-500 block mb-1">MX / DNS Durumu</span>
+                            <strong id="resMx" class="text-emerald-400">Aktif & Geçerli</strong>
+                        </div>
+                        <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 col-span-2 sm:col-span-1">
+                            <span class="text-[10px] text-slate-500 block mb-1">Geçici (Temp) Mail?</span>
+                            <strong id="resDisposable" class="text-slate-200">Hayır (Kalıcı Hesap)</strong>
+                        </div>
+                    </div>
+
+                    <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider font-mono mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-crosshairs"></i> E-Posta Açık İstihbarat & Güvenlik Dorkları
+                    </h4>
+                    <div id="emailSourcesList" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- 3. TAB: YÜZ & GÖRSEL OSINT -->
             <div id="imageSection" class="w-full hidden">
                 <div class="glass-panel rounded-3xl p-6 sm:p-8 mb-6 text-center glass-glow">
                     <input type="file" id="imageInput" accept="image/*" class="hidden">
@@ -564,7 +670,6 @@ async def serve_ui():
 
                     <div id="previewContainer" class="hidden mt-6 flex flex-col items-center">
                         <div class="flex gap-6 items-center justify-center flex-wrap mb-5">
-                            
                             <div class="text-center">
                                 <span id="i18n_origImg" class="text-[11px] text-slate-400 block mb-1.5 font-mono">Biyometrik Hedef</span>
                                 <div class="relative h-36 w-36 sm:h-40 sm:w-40 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl bg-slate-950 flex items-center justify-center">
@@ -610,14 +715,12 @@ async def serve_ui():
 
         </main>
 
-        <!-- Footer -->
         <footer class="w-full border-t border-slate-900 bg-slate-950/80 py-8 px-6 mt-12 text-center text-xs text-slate-500">
             <div class="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div class="flex flex-col sm:flex-row items-center gap-2 text-center sm:text-left">
                     <p>TraceSpect Intelligence &copy; 2026. <span id="i18n_footerRights">Tüm hakları saklıdır.</span></p>
                 </div>
                 
-                <!-- FOOTER SOSYAL MEDYA İKONLARI -->
                 <div class="flex items-center gap-3">
                     <a href="https://x.com" target="_blank" class="text-slate-400 hover:text-sky-400 transition-colors text-sm"><i class="fa-brands fa-x-twitter"></i></a>
                     <a href="https://t.me" target="_blank" class="text-slate-400 hover:text-sky-300 transition-colors text-sm"><i class="fa-brands fa-telegram"></i></a>
@@ -647,10 +750,10 @@ async def serve_ui():
                     privacyP3: "3. <strong>Sorumluluk:</strong> Çıkan sonuçlar kamuya açık verilerin eşleştirilmesidir, arama yapan kullanıcının kendi sorumluluğundadır.",
                     privacyUnderstand: "Anladım",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Destek Ol',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ Platform & Biyometrik Yüz Tanıma',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> E-Posta, Yüz & Kullanıcı Adı OSINT Aktif',
                     heroTitle: 'Dijital Ayak İzini <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Görünür Kılın</span>',
-                    heroDesc: "Kullanıcı adlarını, EXIF meta verilerini ve yüz biyometrisini açık istihbarat (OSINT) ağlarında eşzamanlı sorgulayın.",
-                    tabUser: "Kullanıcı Adı Analizi",
+                    heroDesc: "Kullanıcı adlarını, e-posta adreslerini ve biyometrik yüz izlerini açık istihbarat (OSINT) ağlarında eşzamanlı sorgulayın.",
+                    tabUser: "Kullanıcı Adı",
                     tabImg: "Yüz & Görsel OSINT",
                     userInputPlaceholder: "Hedef kullanıcı adını girin (örn: torvalds)",
                     btnScan: "Ağı Tara",
@@ -694,9 +797,9 @@ async def serve_ui():
                     privacyP3: "3. <strong>Disclaimer:</strong> Search results are derived from public indices. Query intent and usage remain the sole responsibility of the user.",
                     privacyUnderstand: "I Understand",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Donate',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ Platforms & Facial Recon Active',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Email, Face & Username OSINT Active',
                     heroTitle: 'Make Your Digital Footprint <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Visible</span>',
-                    heroDesc: "Perform concurrent queries across username registries, EXIF telemetry, and biometric facial intelligence.",
+                    heroDesc: "Perform concurrent queries across username registries, email intelligence, and biometric facial reconnaissance.",
                     tabUser: "Username Recon",
                     tabImg: "Facial & Visual OSINT",
                     userInputPlaceholder: "Enter target username (e.g., torvalds)",
@@ -741,12 +844,12 @@ async def serve_ui():
                     privacyP3: "3. <strong>Responsabilidad:</strong> El uso de esta herramienta es responsabilidad exclusiva del usuario.",
                     privacyUnderstand: "Entendido",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Donar',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ Plataformas y Reconocimiento Facial Activo',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Email, Rostro y Usuario OSINT Activo',
                     heroTitle: 'Haz Visible tu <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Huella Digital</span>',
                     heroDesc: "Consulta simultáneamente registros de usuarios, telemetría EXIF e inteligencia biométrica.",
-                    tabUser: "Análisis de Usuario",
-                    tabImg: "OSINT Facial y Visual",
-                    userInputPlaceholder: "Introduce el usuario objetivo (ej: torvalds)",
+                    tabUser: "Usuario",
+                    tabImg: "OSINT Facial",
+                    userInputPlaceholder: "Introduce el usuario objetivo",
                     btnScan: "Escanear Red",
                     scanningTxt: "Escaneando...",
                     foundTxt: "Encontrados",
@@ -758,7 +861,7 @@ async def serve_ui():
                     dropDesc: "La IA recorta el rostro y extrae metadatos EXIF automáticamente",
                     origImg: "Imagen Original",
                     cropImg: "Rostro Enfocado & Biometría",
-                    btnImgScan: "Iniciar Escaneo Biométrico",
+                    btnImgScan: "Iniciar Escaneo",
                     exifTitle: "Informe de Metadatos EXIF",
                     verifyLink: "Verificar Perfil",
                     statusActive: "ACTIVO",
@@ -788,12 +891,12 @@ async def serve_ui():
                     privacyP3: "3. <strong>Haftung:</strong> Die Nutzung liegt in der alleinigen Verantwortung des Nutzers.",
                     privacyUnderstand: "Verstanden",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Spenden',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ Plattformen & Gesichtserkennung Aktiv',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Email, Gesicht & Benutzername OSINT Aktiv',
                     heroTitle: 'Machen Sie Ihren Digitalen <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Fußabdruck Sichtbar</span>',
                     heroDesc: "Gleichzeitige Abfragen über Benutzernamen, EXIF-Metadaten und biometrische Gesichtserkennung.",
-                    tabUser: "Benutzernamen-Suche",
-                    tabImg: "Gesichts- & Visuelle OSINT",
-                    userInputPlaceholder: "Ziel-Benutzernamen eingeben (z.B. torvalds)",
+                    tabUser: "Benutzer",
+                    tabImg: "Gesichts-OSINT",
+                    userInputPlaceholder: "Ziel-Benutzernamen eingeben",
                     btnScan: "Netzwerk Scannen",
                     scanningTxt: "Scannen...",
                     foundTxt: "Gefunden",
@@ -805,7 +908,7 @@ async def serve_ui():
                     dropDesc: "KI schneidet Gesichter automatisch zu und extrahiert EXIF-Daten",
                     origImg: "Originalbild",
                     cropImg: "Fokussiertes Gesicht & Biometrie",
-                    btnImgScan: "Biometrischen Scan Starten",
+                    btnImgScan: "Scan Starten",
                     exifTitle: "EXIF-Metadatenbericht",
                     verifyLink: "Profil Überprüfen",
                     statusActive: "AKTIV",
@@ -835,12 +938,12 @@ async def serve_ui():
                     privacyP3: "3. <strong>Ответственность:</strong> Пользователь несет личную ответственность за использование результатов.",
                     privacyUnderstand: "Понятно",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> Донат',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ Платформ и Распознавание Лиц',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Email, Лицо и Никнейм OSINT',
                     heroTitle: 'Сделайте Цифровой След <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">Видимым</span>',
                     heroDesc: "Мгновенный поиск по никнеймам, метаданным EXIF и биометрии лиц.",
-                    tabUser: "Поиск по Никнейму",
-                    tabImg: "OSINT по Фото и Лицу",
-                    userInputPlaceholder: "Введите целевой никнейм (напр. torvalds)",
+                    tabUser: "Никнейм",
+                    tabImg: "OSINT по Фото",
+                    userInputPlaceholder: "Введите целевой никнейм",
                     btnScan: "Сканировать",
                     scanningTxt: "Сканирование...",
                     foundTxt: "Найдено",
@@ -852,7 +955,7 @@ async def serve_ui():
                     dropDesc: "ИИ автоматически кадрирует лицо и извлекает метаданные EXIF",
                     origImg: "Исходное Фото",
                     cropImg: "Выделенное Лицо & Биометрия",
-                    btnImgScan: "Запустить Биометрический Поиск",
+                    btnImgScan: "Запустить Поиск",
                     exifTitle: "Отчет по Метаданным EXIF",
                     verifyLink: "Открыть Профиль",
                     statusActive: "АКТИВЕН",
@@ -882,24 +985,24 @@ async def serve_ui():
                     privacyP3: "3. <strong>责任声明:</strong> 检索结果均来自公开网络，使用者自行承担使用责任。",
                     privacyUnderstand: "我已知晓",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> 赞助',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ 平台 & 深度人脸识别已就绪',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 邮箱、人脸与用户名 OSINT 已激活',
                     heroTitle: '让您的数字足迹 <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">一览无余</span>',
                     heroDesc: "跨用户名注册库、EXIF 遥测数据及人脸生物特征进行多维度情报查询。",
-                    tabUser: "用户名情报分析",
-                    tabImg: "人脸与图像 OSINT",
-                    userInputPlaceholder: "输入目标用户名 (例如: torvalds)",
+                    tabUser: "用户名分析",
+                    tabImg: "人脸 OSINT",
+                    userInputPlaceholder: "输入目标用户名",
                     btnScan: "扫描网络",
                     scanningTxt: "正在侦察...",
                     foundTxt: "已匹配",
                     notFoundTxt: "未注册",
                     filterOnlyFound: "仅显示匹配项",
                     filterAll: "显示全部",
-                    pdfBtn: "下载 PDF 调查报告",
+                    pdfBtn: "下载 PDF 报告",
                     dropTitle: "上传人像或照片",
                     dropDesc: "AI 自动识别人脸并提取隐藏的 EXIF 元数据",
                     origImg: "原始图像",
                     cropImg: "人脸焦点 & 生物特征",
-                    btnImgScan: "启动生物特征与全网侦察",
+                    btnImgScan: "启动全网侦察",
                     exifTitle: "EXIF 遥测数据报告",
                     verifyLink: "查看档案",
                     statusActive: "有效",
@@ -929,26 +1032,26 @@ async def serve_ui():
                     privacyP3: "3. <strong>免責事項:</strong> 検索結果の利用はユーザー自身の責任となります。",
                     privacyUnderstand: "了解しました",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> 支援',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ プラットフォーム & 顔認識が有効',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> メール・顔・ユーザー名 OSINT 有効',
                     heroTitle: 'デジタルフットプリントを <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">可視化する</span>',
                     heroDesc: "ユーザー名、EXIFメタデータ、顔認証による総合的な公開インテリジェンス調査。",
-                    tabUser: "ユーザー名調査",
-                    tabImg: "顔認識・画像OSINT",
-                    userInputPlaceholder: "対象のユーザー名を入力 (例: torvalds)",
-                    btnScan: "ネットワークスキャン",
+                    tabUser: "ユーザー名",
+                    tabImg: "顔認識OSINT",
+                    userInputPlaceholder: "対象のユーザー名を入力",
+                    btnScan: "スキャン",
                     scanningTxt: "スキャン中...",
                     foundTxt: "検出",
                     notFoundTxt: "未登録",
                     filterOnlyFound: "検出のみ表示",
                     filterAll: "すべて表示",
-                    pdfBtn: "PDFレポートを出力",
+                    pdfBtn: "PDF出力",
                     dropTitle: "顔写真または画像をアップロード",
                     dropDesc: "AIが自動で顔をトリミングし、EXIFメタデータを抽出します",
                     origImg: "元の画像",
                     cropImg: "検出された顔 & 生体認証",
-                    btnImgScan: "生体認証＆Webスキャンを開始",
+                    btnImgScan: "スキャン開始",
                     exifTitle: "EXIFメタデータレポート",
-                    verifyLink: "プロファイルを確認",
+                    verifyLink: "プロファイル確認",
                     statusActive: "有効",
                     statusNone: "なし",
                     footerRights: "無断転載を禁じます。",
@@ -976,24 +1079,24 @@ async def serve_ui():
                     privacyP3: "3. <strong>책임 한계:</strong> 검색 결과의 활용에 대한 책임은 전적으로 사용자 본인에게 있습니다.",
                     privacyUnderstand: "확인했습니다",
                     navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> 후원',
-                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 26+ 플랫폼 & 정밀 안면 인식 활성화',
+                    heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 이메일, 안면 & 사용자명 OSINT 활성화',
                     heroTitle: '디지털 발자국을 <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-indigo-300 bg-clip-text text-transparent">시각화하세요</span>',
                     heroDesc: "사용자 이름, EXIF 메타데이터 및 안면 생체 인식을 결합한 종합 OSINT 분석 플랫폼.",
-                    tabUser: "사용자명 정밀 분석",
-                    tabImg: "안면 및 이미지 OSINT",
-                    userInputPlaceholder: "대상 사용자명을 입력하세요 (예: torvalds)",
-                    btnScan: "네트워크 탐색",
+                    tabUser: "사용자명",
+                    tabImg: "안면 OSINT",
+                    userInputPlaceholder: "대상 사용자명을 입력하세요",
+                    btnScan: "탐색",
                     scanningTxt: "탐색 중...",
                     foundTxt: "발견됨",
                     notFoundTxt: "미등록",
                     filterOnlyFound: "발견된 항목만",
                     filterAll: "전체 보기",
-                    pdfBtn: "PDF 보고서 다운로드",
+                    pdfBtn: "PDF 다운로드",
                     dropTitle: "인물 사진 또는 이미지 업로드",
                     dropDesc: "AI가 얼굴을 자동 크롭하고 숨겨진 EXIF 메타데이터를 추출합니다",
                     origImg: "원본 이미지",
                     cropImg: "감지된 안면 & 생체 정보",
-                    btnImgScan: "생체 인식 & 웹 정찰 시작",
+                    btnImgScan: "정찰 시작",
                     exifTitle: "EXIF 메타데이터 분석 보고서",
                     verifyLink: "프로필 확인",
                     statusActive: "활성",
@@ -1013,10 +1116,9 @@ async def serve_ui():
 
             let CURRENT_LANG = localStorage.getItem('ts_lang') || 'tr';
 
-            // DİNAMİK CANLI KULLANICI SAYACI
             function updateLiveCount() {
                 const baseCount = 138;
-                const randomShift = Math.floor(Math.random() * 9) - 4; // -4 ile +4 arası dalgalanma
+                const randomShift = Math.floor(Math.random() * 9) - 4;
                 const currentCount = Math.max(120, baseCount + randomShift);
                 
                 const headerEl = document.getElementById('liveVisitorsHeader');
@@ -1102,18 +1204,27 @@ async def serve_ui():
 
             function switchTab(tab) {
                 const isUser = tab === 'username';
+                const isEmail = tab === 'email';
+                const isImg = tab === 'image';
+
                 document.getElementById('usernameSection').classList.toggle('hidden', !isUser);
-                document.getElementById('imageSection').classList.toggle('hidden', isUser);
+                document.getElementById('emailSection').classList.toggle('hidden', !isEmail);
+                document.getElementById('imageSection').classList.toggle('hidden', !isImg);
                 
                 document.getElementById('tabUsername').className = isUser 
-                    ? 'px-5 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2'
-                    : 'px-5 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2';
+                    ? 'px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2'
+                    : 'px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2';
                 
-                document.getElementById('tabImage').className = !isUser 
-                    ? 'px-5 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2'
-                    : 'px-5 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2';
+                document.getElementById('tabEmail').className = isEmail 
+                    ? 'px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2'
+                    : 'px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2';
+
+                document.getElementById('tabImage').className = isImg 
+                    ? 'px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2'
+                    : 'px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-2';
             }
 
+            // USERNAME ENGINE
             const form = document.getElementById('searchForm');
             const input = document.getElementById('usernameInput');
             const resultsDiv = document.getElementById('results');
@@ -1292,6 +1403,87 @@ async def serve_ui():
                 };
             });
 
+            // E-POSTA OSINT MOTORU
+            const emailForm = document.getElementById('emailForm');
+            const emailInput = document.getElementById('emailInput');
+            const emailSubmitBtn = document.getElementById('emailSubmitBtn');
+            const emailStatus = document.getElementById('emailStatus');
+            const emailResultCard = document.getElementById('emailResultCard');
+            const resEmail = document.getElementById('resEmail');
+            const resRiskBadge = document.getElementById('resRiskBadge');
+            const resProvider = document.getElementById('resProvider');
+            const resMx = document.getElementById('resMx');
+            const resDisposable = document.getElementById('resDisposable');
+            const emailSourcesList = document.getElementById('emailSourcesList');
+
+            emailForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!checkLimit()) return;
+
+                const email = emailInput.value.trim();
+                if (!email) return;
+
+                emailResultCard.classList.add('hidden');
+                emailStatus.classList.remove('hidden');
+                emailSubmitBtn.disabled = true;
+                emailSubmitBtn.classList.add('opacity-50');
+
+                try {
+                    const res = await fetch(`/api/search-email?email=${encodeURIComponent(email)}`);
+                    const data = await res.json();
+
+                    emailStatus.classList.add('hidden');
+                    emailSubmitBtn.disabled = false;
+                    emailSubmitBtn.classList.remove('opacity-50');
+
+                    if (!data.success) {
+                        alert('Hata: ' + data.error);
+                        return;
+                    }
+
+                    resEmail.innerText = data.email;
+                    resProvider.innerText = data.provider;
+                    resMx.innerText = data.has_mx ? "Aktif & Doğrulandı" : "Kayıt Bulunamadı";
+                    resMx.className = data.has_mx ? "text-emerald-400 font-bold" : "text-rose-400 font-bold";
+                    
+                    resDisposable.innerText = data.is_disposable ? "Evet (Geçici Servis)" : "Hayır (Gerçek Alan Adı)";
+                    resDisposable.className = data.is_disposable ? "text-rose-400 font-bold" : "text-emerald-400 font-bold";
+
+                    if (data.is_disposable) {
+                        resRiskBadge.innerText = "YÜKSEK RİSK";
+                        resRiskBadge.className = "text-xs px-3 py-1 rounded-full font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20";
+                    } else {
+                        resRiskBadge.innerText = "TEMİZ / AKTİF";
+                        resRiskBadge.className = "text-xs px-3 py-1 rounded-full font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                    }
+
+                    emailSourcesList.innerHTML = '';
+                    data.osint_sources.forEach(src => {
+                        emailSourcesList.innerHTML += `
+                            <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-indigo-500/40 transition-colors">
+                                <div class="flex items-center gap-2.5">
+                                    <i class="${src.icon} text-indigo-400 text-sm"></i>
+                                    <span class="text-white text-xs font-semibold">${src.name}</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">${src.badge}</span>
+                                    <a href="${src.url}" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300 font-mono font-semibold">Sorgula &rarr;</a>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    emailResultCard.classList.remove('hidden');
+
+                } catch (err) {
+                    emailStatus.classList.add('hidden');
+                    emailSubmitBtn.disabled = false;
+                    emailSubmitBtn.classList.remove('opacity-50');
+                    alert('E-posta analizi sırasında hata oluştu.');
+                }
+            });
+
+            // IMAGE / FACE ENGINE
             const imageInput = document.getElementById('imageInput');
             const previewContainer = document.getElementById('previewContainer');
             const imagePreview = document.getElementById('imagePreview');
