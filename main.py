@@ -61,7 +61,6 @@ DISPOSABLE_DOMAINS = {
     "getairmail.com", "throwawaymail.com", "temp-mail.org"
 }
 
-# SEO: robots.txt
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots_txt():
     return """User-agent: *
@@ -69,41 +68,33 @@ Allow: /
 Sitemap: https://tracespect.com/sitemap.xml
 """
 
-# GOOGLE ADSENSE: ads.txt
 @app.get("/ads.txt", response_class=PlainTextResponse)
 def ads_txt():
     return "google.com, pub-6573727477932427, DIRECT, f08c47fec0942fa0\n"
 
-# SEO: sitemap.xml
 @app.get("/sitemap.xml")
 def sitemap_xml():
     xml_content = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://tracespect.com/</loc><lastmod>2026-08-17</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>
-  <url><loc>https://tracespect.com/rehber/osint-nedir</loc><lastmod>2026-08-17</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tracespect.com/rehber/dijital-ayak-izi-temizleme</loc><lastmod>2026-08-17</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tracespect.com/rehber/biyometrik-yuz-arama-nasil-calisir</loc><lastmod>2026-08-17</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tracespect.com/rehber/e-posta-guvenligi-ve-veri-sizintilari</loc><lastmod>2026-08-17</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tracespect.com/hakkimizda</loc><lastmod>2026-08-17</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
 </urlset>
 """
     return Response(content=xml_content, media_type="application/xml")
 
-def get_article_html(title: str, description: str, content_html: str):
-    return f"""
+@app.get("/", response_class=HTMLResponse)
+async def serve_ui():
+    return """
     <!DOCTYPE html>
     <html lang="tr" class="dark">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{title} | TraceSpect Bilgi Merkezi</title>
-        <meta name="description" content="{description}">
-        <link rel="canonical" href="https://tracespect.com/">
+        <title>TraceSpect | OSINT</title>
         
-        <!-- Google AdSense Meta & Script -->
+        <!-- Google AdSense -->
         <meta name="google-adsense-account" content="ca-pub-6573727477932427">
         <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6573727477932427" crossorigin="anonymous"></script>
-
+        
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
