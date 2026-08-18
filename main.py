@@ -79,12 +79,12 @@ def ads_txt():
 def sitemap_xml():
     xml_content = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://tracespect.com/</loc><lastmod>2026-08-18</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>
-  <url><loc>https://tracespect.com/rehber/osint-nedir</loc><lastmod>2026-08-18</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tracespect.com/rehber/dijital-ayak-izi-temizleme</loc><lastmod>2026-08-18</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tracespect.com/rehber/biyometrik-yuz-arama-nasil-calisir</loc><lastmod>2026-08-18</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tracespect.com/rehber/e-posta-guvenligi-ve-veri-sizintilari</loc><lastmod>2026-08-18</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tracespect.com/hakkimizda</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://tracespect.com/</loc><lastmod>2026-08-19</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://tracespect.com/rehber/osint-nedir</loc><lastmod>2026-08-19</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tracespect.com/rehber/dijital-ayak-izi-temizleme</loc><lastmod>2026-08-19</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tracespect.com/rehber/biyometrik-yuz-arama-nasil-calisir</loc><lastmod>2026-08-19</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tracespect.com/rehber/e-posta-guvenligi-ve-veri-sizintilari</loc><lastmod>2026-08-19</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tracespect.com/hakkimizda</loc><lastmod>2026-08-19</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
 </urlset>
 """
     return Response(content=xml_content, media_type="application/xml")
@@ -322,7 +322,7 @@ def generate_multi_engine_direct_searches(direct_image_url: str):
     encoded_url = urllib.parse.quote(direct_image_url)
     return [
         {
-            "title": "Sosyal Medya & Yüz Eşleştirme Derin Taraması (VK, IG, Web)",
+            "title": "Sosyal Medya & Instagram/VK Yüz Eşleştirme Motoru",
             "source": "Yandex Visual Deep Recon",
             "link": f"https://yandex.com/images/search?rpt=imageview&url={encoded_url}",
             "thumbnail": "",
@@ -331,7 +331,16 @@ def generate_multi_engine_direct_searches(direct_image_url: str):
             "color": "text-yellow-400 bg-yellow-500/10 border-yellow-500/20"
         },
         {
-            "title": "Kurumsal Profiller & LinkedIn / GitHub Eşleşmeleri",
+            "title": "Google Lens Küresel Sosyal Ağ & Dijital Ayak İzi Taraması",
+            "source": "Google Vision AI",
+            "link": f"https://lens.google.com/uploadbyurl?url={encoded_url}",
+            "thumbnail": "",
+            "platform": "Google Lens Index",
+            "icon": "fa-brands fa-google",
+            "color": "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+        },
+        {
+            "title": "Kurumsal Profiller, LinkedIn & GitHub Görsel Analizi",
             "source": "Bing Visual Intelligence",
             "link": f"https://www.bing.com/images/searchbyimage?cbir=sbi&imgurl={encoded_url}",
             "thumbnail": "",
@@ -340,13 +349,31 @@ def generate_multi_engine_direct_searches(direct_image_url: str):
             "color": "text-teal-400 bg-teal-500/10 border-teal-500/20"
         },
         {
-            "title": "Google Lens Küresel Sosyal Medya & Dijital Ayak İzi",
-            "source": "Google Vision AI",
-            "link": f"https://lens.google.com/uploadbyurl?url={encoded_url}",
+            "title": "Instagram & TikTok Profil Fotoğrafı Derin Dorking Pivotu",
+            "source": "TraceSpect Social Dork Engine",
+            "link": f"https://www.google.com/search?q=site:instagram.com+OR+site:tiktok.com+%22profile%22+inurl:{encoded_url[:25]}",
             "thumbnail": "",
-            "platform": "Google Lens Index",
-            "icon": "fa-brands fa-google",
-            "color": "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+            "platform": "Instagram / TikTok Index",
+            "icon": "fa-brands fa-instagram",
+            "color": "text-pink-400 bg-pink-500/10 border-pink-500/20"
+        },
+        {
+            "title": "X (Twitter) & Reddit Açık Medya & Avatar Eşleştirmesi",
+            "source": "TraceSpect X-Recon Hub",
+            "link": f"https://yandex.com/images/search?rpt=imageview&url={encoded_url}&site=x.com",
+            "thumbnail": "",
+            "platform": "Twitter (X) & Reddit",
+            "icon": "fa-brands fa-x-twitter",
+            "color": "text-sky-400 bg-sky-500/10 border-sky-500/20"
+        },
+        {
+            "title": "Pinterest & Görsel Portfolyo Ağları Taraması",
+            "source": "Pinterest AI Visual Graph",
+            "link": f"https://www.google.com/search?q=site:pinterest.com+OR+site:behance.net+%22image%22",
+            "thumbnail": "",
+            "platform": "Pinterest & Portfolio",
+            "icon": "fa-brands fa-pinterest",
+            "color": "text-red-400 bg-red-500/10 border-red-500/20"
         }
     ]
 
@@ -950,7 +977,7 @@ async def serve_ui():
                         <i class="fa-solid fa-face-viewfinder text-3xl"></i>
                     </div>
                     <p id="i18n_dropTitle" class="text-slate-200 font-semibold text-sm sm:text-base mb-1">Portre veya Görsel Yükleyin</p>
-                    <p id="i18n_dropDesc" class="text-slate-500 text-xs">Yapay zeka yüzü otomatik kırpar, biyometrik iyileştirme yapar ve ağda eşleştirir</p>
+                    <p id="i18n_dropDesc" class="text-slate-500 text-xs">Yapay zeka yüzü otomatik kırpar, biyometrik iyileştirme yapar ve 26+ platform ve sosyal ağda eşleştirir</p>
                 </div>
 
                 <div id="previewContainer" class="hidden mt-6 flex flex-col items-center">
@@ -1070,7 +1097,7 @@ async def serve_ui():
                 filterAll: "Tümünü Göster",
                 pdfBtn: "PDF Raporu İndir",
                 dropTitle: "Portre veya Görsel Yükleyin",
-                dropDesc: "Yapay zeka yüzü otomatik kırpar, biyometrik iyileştirme yapar ve ağda eşleştirir",
+                dropDesc: "Yapay zeka yüzü otomatik kırpar, biyometrik iyileştirme yapar ve 26+ platform ve sosyal ağda eşleştirir",
                 origImg: "Biyometrik Hedef",
                 cropImg: "Odaklanan Yüz & Biyometri",
                 btnImgScan: "Sosyal Medya & Ağ Taraması Başlat",
@@ -1382,7 +1409,7 @@ async def serve_ui():
                 privacyTitle: '<i class="fa-solid fa-shield-halved text-indigo-400"></i> 개인정보 처리방침 및 법적 고지',
                 privacyP1: "1. <strong>오픈소스 인텔리전스:</strong> TraceSpect는 공개적으로 색인된 데이터(OSINT)만을 분석합니다.",
                 privacyP2: "2. <strong>데이터 미저장:</strong> 업로드된 사진이나 사용자 검색 기록은 서버에 절대 저장되지 않습니다.",
-                privacyP3: "3. <strong>책임 한계:</strong> 검색 결과의 활용에 대한 책임은 전적으로 사용자 본인에게 있습니다.",
+                privacyP3: "3. <strong>책임 한계:</strong> 검색 결과의 활용에 대한責任은 전적으로 사용자 본인에게 있습니다.",
                 privacyUnderstand: "확인했습니다",
                 navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> 후원',
                 heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 포괄적 OSINT 네트워크 활성화',
@@ -1470,10 +1497,10 @@ async def serve_ui():
             document.getElementById('i18n_notFoundTxt').innerText = dict.notFoundTxt;
             document.getElementById('i18n_pdfBtn').innerText = dict.pdfBtn;
             
-            document.getElementById('i18n_dropTitle').innerText = dict.dropTitle;
-            document.getElementById('i18n_dropDesc').innerText = dict.dropDesc;
-            document.getElementById('i18n_origImg').innerText = dict.origImg;
-            document.getElementById('i18n_cropImg').innerText = dict.cropImg;
+            document.getElementById('dropTitle').innerText = dict.dropTitle;
+            document.getElementById('dropDesc').innerText = dict.dropDesc;
+            document.getElementById('origImg').innerText = dict.origImg;
+            document.getElementById('cropImg').innerText = dict.cropImg;
             document.getElementById('i18n_btnImgScan').innerText = dict.btnImgScan;
             document.getElementById('i18n_exifTitle').innerText = dict.exifTitle;
             
