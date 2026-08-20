@@ -69,22 +69,22 @@ Allow: /
 Sitemap: https://tracespect.com/sitemap.xml
 """
 
-# GOOGLE ADSENSE: ads.txt
+# GOOGLE ADSENSE: ads.txt (Güncellendi)
 @app.get("/ads.txt", response_class=PlainTextResponse)
 def ads_txt():
-    return "google.com, pub-6573727477932427, DIRECT, f08c47fec0942fa0\n"
+    return "google.com, pub-9057866693016267, DIRECT, f08c47fec0942fa0\n"
 
 # SEO: sitemap.xml
 @app.get("/sitemap.xml")
 def sitemap_xml():
     xml_content = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://tracespect.com/</loc><lastmod>2026-08-19</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>
-  <url><loc>https://tracespect.com/rehber/osint-nedir</loc><lastmod>2026-08-19</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tracespect.com/rehber/dijital-ayak-izi-temizleme</loc><lastmod>2026-08-19</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tracespect.com/rehber/biyometrik-yuz-arama-nasil-calisir</loc><lastmod>2026-08-19</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tracespect.com/rehber/e-posta-guvenligi-ve-veri-sizintilari</loc><lastmod>2026-08-19</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tracespect.com/hakkimizda</loc><lastmod>2026-08-19</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://tracespect.com/</loc><lastmod>2026-08-20</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://tracespect.com/rehber/osint-nedir</loc><lastmod>2026-08-20</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tracespect.com/rehber/dijital-ayak-izi-temizleme</loc><lastmod>2026-08-20</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tracespect.com/rehber/biyometrik-yuz-arama-nasil-calisir</loc><lastmod>2026-08-20</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tracespect.com/rehber/e-posta-guvenligi-ve-veri-sizintilari</loc><lastmod>2026-08-20</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tracespect.com/hakkimizda</loc><lastmod>2026-08-20</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
 </urlset>
 """
     return Response(content=xml_content, media_type="application/xml")
@@ -99,8 +99,9 @@ def get_article_html(title: str, description: str, content_html: str):
     <meta name="description" content="{description}">
     <link rel="canonical" href="https://tracespect.com/">
     
-    <meta name="google-adsense-account" content="ca-pub-6573727477932427">
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6573727477932427" crossorigin="anonymous"></script>
+    <!-- Google AdSense Meta & Script (Güncellendi) -->
+    <meta name="google-adsense-account" content="ca-pub-9057866693016267">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9057866693016267" crossorigin="anonymous"></script>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -608,9 +609,9 @@ async def serve_ui():
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://tracespect.com/">
 
-    <!-- Google AdSense Meta & Script Doğrulaması -->
-    <meta name="google-adsense-account" content="ca-pub-6573727477932427">
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6573727477932427" crossorigin="anonymous"></script>
+    <!-- Google AdSense Meta & Script Doğrulaması (Güncellendi) -->
+    <meta name="google-adsense-account" content="ca-pub-9057866693016267">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9057866693016267" crossorigin="anonymous"></script>
 
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://tracespect.com/">
@@ -1409,7 +1410,7 @@ async def serve_ui():
                 privacyTitle: '<i class="fa-solid fa-shield-halved text-indigo-400"></i> 개인정보 처리방침 및 법적 고지',
                 privacyP1: "1. <strong>오픈소스 인텔리전스:</strong> TraceSpect는 공개적으로 색인된 데이터(OSINT)만을 분석합니다.",
                 privacyP2: "2. <strong>데이터 미저장:</strong> 업로드된 사진이나 사용자 검색 기록은 서버에 절대 저장되지 않습니다.",
-                privacyP3: "3. <strong>책임 한계:</strong> 검색 결과의 활용에 대한責任은 전적으로 사용자 본인에게 있습니다.",
+                privacyP3: "3. <strong>책임 한계:</strong> 검색 결과의 활용에 대한 책임은 전적으로 사용자 본인에게 있습니다.",
                 privacyUnderstand: "확인했습니다",
                 navDonate: '<i class="fa-solid fa-mug-hot text-amber-400"></i> 후원',
                 heroBadge: '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 포괄적 OSINT 네트워크 활성화',
